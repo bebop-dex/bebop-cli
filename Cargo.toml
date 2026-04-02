@@ -1,8 +1,8 @@
 [package]
 name = "bebop-cli"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
-description = "A simple to use, efficient, and full-featured Command Line Argument Parser"
+description = "Command-line interface for the Bebop DEX RFQ trading API"
 repository = "https://github.com/bebop-dex/bebop-cli"
 
 [dependencies]
