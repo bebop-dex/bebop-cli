@@ -6,7 +6,7 @@ pub fn update() {
         .repo_owner("bebop-dex")
         .repo_name("bebop-cli")
         .bin_name("bebop")
-        .bin_path_in_archive(&format!("bebop-{}/{{{{bin_name}}}}", target))
+        .bin_path_in_archive(&format!("bebop-{}/bebop", target))
         .show_download_progress(true)
         .current_version(cargo_crate_version!())
         .build()
