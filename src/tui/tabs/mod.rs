@@ -2,4 +2,4 @@
 pub mod dashboard;
 pub mod tokens;
 pub mod quote;
-// pub mod config;
+pub mod config;

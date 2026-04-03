@@ -75,9 +75,7 @@ fn render_content(frame: &mut Frame, area: Rect, app: &mut App) {
             super::tabs::quote::render(frame, area, app);
         }
         ActiveTab::Config => {
-            let content = Paragraph::new("Config \u{2014} settings editor coming soon")
-                .style(theme::CONTENT_TEXT);
-            frame.render_widget(content, area);
+            super::tabs::config::render(frame, area, app);
         }
     }
 }
@@ -106,6 +104,8 @@ fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
                 ("\u{2191}\u{2193}", "navigate"),
                 ("/", "search"),
                 ("c", "chain"),
+                ("s", "sell"),
+                ("b", "buy"),
                 ("q", "quit"),
             ]
         }
@@ -151,6 +151,32 @@ fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
                 ("\u{2191}\u{2193}", "navigate"),
                 ("n", "new quote"),
                 ("d", "delete"),
+                ("q", "quit"),
+            ]
+        }
+
+        // Config tab
+        ActiveTab::Config
+            if app.config_state.chain_picker_open || app.config_state.global_chain_picker =>
+        {
+            vec![
+                ("\u{2191}\u{2193}", "navigate"),
+                ("\u{23ce}", "select"),
+                ("Esc", "cancel"),
+            ]
+        }
+        ActiveTab::Config if app.config_state.editing => {
+            vec![
+                ("type", "edit"),
+                ("\u{23ce}", "confirm"),
+                ("Esc", "cancel"),
+            ]
+        }
+        ActiveTab::Config => {
+            vec![
+                ("\u{2190}\u{2192}", "tabs"),
+                ("\u{2191}\u{2193}", "fields"),
+                ("\u{23ce}", "edit"),
                 ("q", "quit"),
             ]
         }

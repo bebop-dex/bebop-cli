@@ -4,6 +4,7 @@ use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 
 use super::app::{ActiveTab, App};
 use super::state::LoadState;
+use super::state::config_state::ConfigField;
 use super::state::quote_state::{FormField, TokenSearchTarget};
 use super::state::tokens_state::InputMode;
 
@@ -21,6 +22,12 @@ pub fn handle_events(app: &mut App) -> std::io::Result<()> {
 }
 
 fn handle_key(app: &mut App, key: KeyEvent) {
+    // Layer 0: Global chain picker (Shift+C from any tab)
+    if app.config_state.global_chain_picker {
+        handle_global_chain_picker_key(app, key);
+        return;
+    }
+
     // Layer 1: Modal interceptors — tokens tab
     if app.tokens_state.chain_picker_open {
         handle_chain_picker_key(app, key);
@@ -60,6 +67,18 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         }
     }
 
+    // Layer 1: Modal interceptors — config tab
+    if app.active_tab == ActiveTab::Config {
+        if app.config_state.chain_picker_open {
+            handle_config_chain_picker_key(app, key);
+            return;
+        }
+        if app.config_state.editing {
+            handle_config_editing_key(app, key);
+            return;
+        }
+    }
+
     // Layer 2: Tab-specific keys
     if app.active_tab == ActiveTab::Tokens && handle_tokens_key(app, key) {
         return;
@@ -67,12 +86,30 @@ fn handle_key(app: &mut App, key: KeyEvent) {
     if app.active_tab == ActiveTab::Quote && handle_quote_key(app, key) {
         return;
     }
+    if app.active_tab == ActiveTab::Config && handle_config_key(app, key) {
+        return;
+    }
 
     // Layer 3: Global keys
     match key.code {
         KeyCode::Char('q') => app.quit(),
-        KeyCode::Right => app.next_tab(),
-        KeyCode::Left => app.prev_tab(),
+        KeyCode::Right | KeyCode::Tab => app.next_tab(),
+        KeyCode::Left | KeyCode::BackTab => app.prev_tab(),
+        KeyCode::Char('C') => {
+            // Shift+C: global chain selector
+            if app.config_state.chains_load_state != LoadState::Loaded {
+                app.request_chains();
+            }
+            app.config_state.global_chain_picker = true;
+            if let Some(pos) = app
+                .config_state
+                .chains
+                .iter()
+                .position(|c| Some(c.as_str()) == app.config.chain.as_deref())
+            {
+                app.config_state.chain_picker_index = pos;
+            }
+        }
         _ => {}
     }
 }
@@ -158,6 +195,42 @@ fn handle_tokens_key(app: &mut App, key: KeyEvent) -> bool {
                 .position(|c| c == &app.tokens_state.selected_chain)
             {
                 app.tokens_state.chain_picker_index = pos;
+            }
+            true
+        }
+        KeyCode::Char('s') => {
+            if let Some(token) = app.tokens_state.selected_token().cloned() {
+                let token_chain = app.tokens_state.selected_chain.clone();
+                app.active_tab = ActiveTab::Quote;
+                app.check_quote_init();
+                if token_chain != app.quote_state.selected_chain {
+                    app.quote_state.selected_chain = token_chain;
+                    app.quote_state.sell_token = None;
+                    app.quote_state.buy_token = None;
+                    app.request_quote_tokens();
+                }
+                app.quote_state.sell_token = Some(token);
+                app.quote_state.form_open = true;
+                app.quote_state.active_field = FormField::BuyToken;
+                app.quote_state.quote_error = None;
+            }
+            true
+        }
+        KeyCode::Char('b') => {
+            if let Some(token) = app.tokens_state.selected_token().cloned() {
+                let token_chain = app.tokens_state.selected_chain.clone();
+                app.active_tab = ActiveTab::Quote;
+                app.check_quote_init();
+                if token_chain != app.quote_state.selected_chain {
+                    app.quote_state.selected_chain = token_chain;
+                    app.quote_state.sell_token = None;
+                    app.quote_state.buy_token = None;
+                    app.request_quote_tokens();
+                }
+                app.quote_state.buy_token = Some(token);
+                app.quote_state.form_open = true;
+                app.quote_state.active_field = FormField::SellToken;
+                app.quote_state.quote_error = None;
             }
             true
         }
@@ -384,5 +457,198 @@ fn open_quote_chain_picker(app: &mut App) {
         .position(|c| c == &app.quote_state.selected_chain)
     {
         app.quote_state.chain_picker_index = pos;
+    }
+}
+
+// --- Global chain picker handler ---
+
+fn handle_global_chain_picker_key(app: &mut App, key: KeyEvent) {
+    let chain_count = app.config_state.chains.len();
+    match key.code {
+        KeyCode::Up => {
+            if app.config_state.chain_picker_index > 0 {
+                app.config_state.chain_picker_index -= 1;
+            }
+        }
+        KeyCode::Down => {
+            if chain_count > 0 && app.config_state.chain_picker_index < chain_count - 1 {
+                app.config_state.chain_picker_index += 1;
+            }
+        }
+        KeyCode::Enter => {
+            if let Some(chain) = app
+                .config_state
+                .chains
+                .get(app.config_state.chain_picker_index)
+                .cloned()
+            {
+                // Update config
+                app.config.chain = Some(chain.clone());
+                app.save_config();
+
+                // Propagate to tokens tab
+                if app.tokens_state.initialized {
+                    app.tokens_state.selected_chain = chain.clone();
+                    app.tokens_state.selected_index = 0;
+                    app.tokens_state.scroll_offset = 0;
+                    app.tokens_state.search_query.clear();
+                    app.request_tokens();
+                }
+
+                // Propagate to quote tab
+                app.quote_state.selected_chain = chain;
+                app.quote_state.sell_token = None;
+                app.quote_state.buy_token = None;
+                if app.quote_state.initialized {
+                    app.request_quote_tokens();
+                }
+
+                app.config_state.global_chain_picker = false;
+            }
+        }
+        KeyCode::Esc => {
+            app.config_state.global_chain_picker = false;
+        }
+        _ => {}
+    }
+}
+
+// --- Config tab handlers ---
+
+fn handle_config_chain_picker_key(app: &mut App, key: KeyEvent) {
+    let chain_count = app.config_state.chains.len();
+    match key.code {
+        KeyCode::Up => {
+            if app.config_state.chain_picker_index > 0 {
+                app.config_state.chain_picker_index -= 1;
+            }
+        }
+        KeyCode::Down => {
+            if chain_count > 0 && app.config_state.chain_picker_index < chain_count - 1 {
+                app.config_state.chain_picker_index += 1;
+            }
+        }
+        KeyCode::Enter => {
+            if let Some(chain) = app
+                .config_state
+                .chains
+                .get(app.config_state.chain_picker_index)
+                .cloned()
+            {
+                app.config.chain = Some(chain);
+                app.save_config();
+                app.config_state.chain_picker_open = false;
+            }
+        }
+        KeyCode::Esc => {
+            app.config_state.chain_picker_open = false;
+        }
+        _ => {}
+    }
+}
+
+fn handle_config_editing_key(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Enter => {
+            // Confirm edit: apply draft to the appropriate config field
+            let draft = app.config_state.draft.clone();
+            let result = match app.config_state.active_field {
+                ConfigField::ApiKey => {
+                    if draft.is_empty() {
+                        app.config.api_key = None;
+                    } else {
+                        app.config.api_key = Some(draft);
+                    }
+                    Ok(())
+                }
+                ConfigField::WalletAddress => {
+                    if draft.is_empty() {
+                        app.config.wallet_address = None;
+                    } else {
+                        app.config.wallet_address = Some(draft);
+                    }
+                    Ok(())
+                }
+                _ => Ok(()), // Chain and Format don't use text editing
+            };
+            match result {
+                Ok(()) => {
+                    app.save_config();
+                    app.config_state.save_error = None;
+                }
+                Err(e) => {
+                    app.config_state.save_error = Some(e);
+                }
+            }
+            app.config_state.editing = false;
+            app.config_state.draft.clear();
+        }
+        KeyCode::Esc => {
+            app.config_state.cancel_editing();
+        }
+        KeyCode::Backspace => {
+            app.config_state.draft.pop();
+        }
+        KeyCode::Char(c) => {
+            app.config_state.draft.push(c);
+        }
+        _ => {}
+    }
+}
+
+/// Returns true if the key was consumed by the config tab.
+fn handle_config_key(app: &mut App, key: KeyEvent) -> bool {
+    match key.code {
+        KeyCode::Up => {
+            app.config_state.prev_field();
+            true
+        }
+        KeyCode::Down | KeyCode::Tab => {
+            app.config_state.next_field();
+            true
+        }
+        KeyCode::BackTab => {
+            app.config_state.prev_field();
+            true
+        }
+        KeyCode::Enter => {
+            handle_config_field_activate(app);
+            true
+        }
+        _ => false,
+    }
+}
+
+fn handle_config_field_activate(app: &mut App) {
+    match app.config_state.active_field {
+        ConfigField::ApiKey => {
+            let current = app.config.api_key.as_deref().unwrap_or("");
+            app.config_state.start_editing(current);
+        }
+        ConfigField::WalletAddress => {
+            let current = app.config.wallet_address.as_deref().unwrap_or("");
+            app.config_state.start_editing(current);
+        }
+        ConfigField::DefaultChain => {
+            if app.config_state.chains_load_state != LoadState::Loaded {
+                app.request_chains();
+            }
+            app.config_state.chain_picker_open = true;
+            if let Some(pos) = app
+                .config_state
+                .chains
+                .iter()
+                .position(|c| Some(c.as_str()) == app.config.chain.as_deref())
+            {
+                app.config_state.chain_picker_index = pos;
+            }
+        }
+        ConfigField::OutputFormat => {
+            // Toggle between json and text
+            let current = app.config.format.as_deref().unwrap_or("json");
+            let new_format = if current == "json" { "text" } else { "json" };
+            app.config.format = Some(new_format.to_string());
+            app.save_config();
+        }
     }
 }

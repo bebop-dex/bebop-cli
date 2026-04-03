@@ -78,7 +78,6 @@ impl TokensState {
         self.filtered_indices.len()
     }
 
-    #[allow(dead_code)] // used in epoch 5 (s/b shortcuts)
     pub fn selected_token(&self) -> Option<&Token> {
         self.filtered_indices
             .get(self.selected_index)

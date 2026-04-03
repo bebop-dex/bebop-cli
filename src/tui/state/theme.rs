@@ -89,6 +89,14 @@ pub const QUOTE_DELETE_PROMPT: Style = Style::new()
     .fg(Color::Red)
     .add_modifier(Modifier::BOLD);
 
+// Config tab
+pub const CONFIG_LABEL: Style = Style::new().fg(Color::Gray);
+pub const CONFIG_VALUE: Style = Style::new().fg(Color::White);
+pub const CONFIG_ACTIVE: Style = Style::new()
+    .fg(Color::Cyan)
+    .add_modifier(Modifier::BOLD);
+pub const CONFIG_ERROR: Style = Style::new().fg(Color::Red);
+
 // Token search modal
 pub const TOKEN_SEARCH_BORDER: Style = Style::new().fg(Color::Cyan);
 pub const TOKEN_SEARCH_INPUT: Style = Style::new().fg(Color::White);

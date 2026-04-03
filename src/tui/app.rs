@@ -4,6 +4,7 @@ use crate::config::Config;
 
 use super::message::AppMessage;
 use super::state::LoadState;
+use super::state::config_state::ConfigState;
 use super::state::quote_state::{QuoteEntry, QuoteEntryStatus, QuoteState};
 use super::state::tokens_state::TokensState;
 
@@ -57,6 +58,7 @@ pub struct App {
     pub config: Config,
     pub tokens_state: TokensState,
     pub quote_state: QuoteState,
+    pub config_state: ConfigState,
     pub tx: UnboundedSender<AppMessage>,
 }
 
@@ -65,12 +67,14 @@ impl App {
         let config = Config::load();
         let tokens_state = TokensState::new(config.chain.as_deref());
         let quote_state = QuoteState::new(config.chain.as_deref());
+        let config_state = ConfigState::new();
         Self {
             active_tab: ActiveTab::Dashboard,
             running: true,
             config,
             tokens_state,
             quote_state,
+            config_state,
             tx,
         }
     }
@@ -92,6 +96,7 @@ impl App {
     fn check_lazy_init(&mut self) {
         self.check_tokens_init();
         self.check_quote_init();
+        self.check_config_init();
     }
 
     pub fn check_tokens_init(&mut self) {
@@ -108,6 +113,19 @@ impl App {
             self.request_quote_tokens();
             self.request_quote_chains();
         }
+    }
+
+    pub fn check_config_init(&mut self) {
+        if self.active_tab == ActiveTab::Config && !self.config_state.initialized {
+            self.config_state.initialized = true;
+            if self.config_state.chains_load_state == LoadState::Idle {
+                self.request_chains();
+            }
+        }
+    }
+
+    pub fn save_config(&mut self) {
+        self.config.save();
     }
 
     // --- Tokens tab requests ---
@@ -396,12 +414,15 @@ impl App {
             AppMessage::ChainsLoaded { chains } => {
                 self.tokens_state.chains = chains.clone();
                 self.tokens_state.chains_load_state = LoadState::Loaded;
-                self.quote_state.chains = chains;
+                self.quote_state.chains = chains.clone();
                 self.quote_state.chains_load_state = LoadState::Loaded;
+                self.config_state.chains = chains;
+                self.config_state.chains_load_state = LoadState::Loaded;
             }
             AppMessage::ChainsError { error } => {
                 self.tokens_state.chains_load_state = LoadState::Error(error.clone());
-                self.quote_state.chains_load_state = LoadState::Error(error);
+                self.quote_state.chains_load_state = LoadState::Error(error.clone());
+                self.config_state.chains_load_state = LoadState::Error(error);
             }
 
             // Quote tab
