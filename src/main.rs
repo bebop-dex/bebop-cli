@@ -5,10 +5,11 @@ mod chains;
 mod config;
 mod quote;
 mod tokens;
+mod tui;
 mod update;
 
 #[derive(Parser)]
-#[command(version, about, arg_required_else_help = true)]
+#[command(version, about)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -152,6 +153,19 @@ async fn main() {
         Some(Commands::Update {}) => {
             update::update();
         }
-        _ => {}
+        Some(Commands::Manifest {}) => {}
+        None => {
+            use std::io::IsTerminal;
+            if std::io::stdout().is_terminal() {
+                if let Err(e) = tui::run() {
+                    eprintln!("TUI error: {e}");
+                    std::process::exit(1);
+                }
+            } else {
+                use clap::CommandFactory;
+                Cli::command().print_help().ok();
+                println!();
+            }
+        }
     }
 }
