@@ -8,7 +8,7 @@ struct TokenList {
     tokens: Vec<Token>,
 }
 
-#[derive(Deserialize, Serialize, Tabled)]
+#[derive(Deserialize, Serialize, Tabled, Clone)]
 pub struct Token {
     pub symbol: String,
     pub name: String,
@@ -75,6 +75,28 @@ pub async fn fetch_tokens(chain: &str) -> Vec<Token> {
     };
     tokens.sort_by(|a, b| a.symbol.to_lowercase().cmp(&b.symbol.to_lowercase()));
     tokens
+}
+
+pub async fn try_fetch_tokens(chain: &str) -> Result<Vec<Token>, String> {
+    let cache_key = format!("tokens_{chain}");
+    let mut tokens = if let Some(cached) = crate::cache::read(&cache_key) {
+        serde_json::from_str(&cached).map_err(|e| e.to_string())?
+    } else {
+        let url = format!("https://api.bebop.xyz/pmm/{chain}/v3/tokenlist");
+        let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            return Err(format!("unknown chain '{chain}' (HTTP {})", resp.status()));
+        }
+        let tokens = resp
+            .json::<TokenList>()
+            .await
+            .map_err(|e| e.to_string())?
+            .tokens;
+        crate::cache::write(&cache_key, &serde_json::to_string(&tokens).unwrap());
+        tokens
+    };
+    tokens.sort_by(|a, b| a.symbol.to_lowercase().cmp(&b.symbol.to_lowercase()));
+    Ok(tokens)
 }
 
 pub fn resolve<'a>(query: &str, tokens: &'a [Token]) -> &'a Token {

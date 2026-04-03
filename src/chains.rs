@@ -24,6 +24,20 @@ pub async fn fetch() -> BTreeMap<String, u64> {
     data
 }
 
+pub async fn try_fetch() -> Result<BTreeMap<String, u64>, String> {
+    if let Some(cached) = crate::cache::read("chains") {
+        return serde_json::from_str(&cached).map_err(|e| e.to_string());
+    }
+    let data = reqwest::get("https://api.bebop.xyz/pmm/chains")
+        .await
+        .map_err(|e| e.to_string())?
+        .json::<BTreeMap<String, u64>>()
+        .await
+        .map_err(|e| e.to_string())?;
+    crate::cache::write("chains", &serde_json::to_string(&data).unwrap());
+    Ok(data)
+}
+
 pub async fn list(output: &OutputFormat) {
     let spinner = indicatif::ProgressBar::new_spinner();
     spinner.set_message("Fetching chains...");

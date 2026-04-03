@@ -5,8 +5,9 @@ use ratatui::widgets::{Paragraph, Tabs};
 
 use super::app::{ActiveTab, App};
 use super::state::theme;
+use super::state::tokens_state::InputMode;
 
-pub fn render(frame: &mut Frame, app: &App) {
+pub fn render(frame: &mut Frame, app: &mut App) {
     let chunks = Layout::vertical([
         Constraint::Length(1),
         Constraint::Length(1),
@@ -18,7 +19,7 @@ pub fn render(frame: &mut Frame, app: &App) {
     render_header(frame, chunks[0], app);
     render_tab_bar(frame, chunks[1], app.active_tab);
     render_content(frame, chunks[2], app);
-    render_footer(frame, chunks[3]);
+    render_footer(frame, chunks[3], app);
 }
 
 fn render_header(frame: &mut Frame, area: Rect, app: &App) {
@@ -62,15 +63,13 @@ fn render_tab_bar(frame: &mut Frame, area: Rect, active: ActiveTab) {
     frame.render_widget(tabs, area);
 }
 
-fn render_content(frame: &mut Frame, area: Rect, app: &App) {
+fn render_content(frame: &mut Frame, area: Rect, app: &mut App) {
     match app.active_tab {
         ActiveTab::Dashboard => {
             super::tabs::dashboard::render(frame, area, app);
         }
         ActiveTab::Tokens => {
-            let content = Paragraph::new("Tokens \u{2014} token browser coming soon")
-                .style(theme::CONTENT_TEXT);
-            frame.render_widget(content, area);
+            super::tabs::tokens::render(frame, area, app);
         }
         ActiveTab::Quote => {
             let content = Paragraph::new("Quote \u{2014} RFQ interface coming soon")
@@ -85,18 +84,61 @@ fn render_content(frame: &mut Frame, area: Rect, app: &App) {
     }
 }
 
-fn render_footer(frame: &mut Frame, area: Rect) {
-    let footer = Line::from(vec![
-        Span::styled(" \u{2190}\u{2192} tabs", theme::FOOTER_KEY),
-        Span::raw("  "),
-        Span::styled("\u{2191}\u{2193} navigate", theme::FOOTER_KEY),
-        Span::raw("  "),
-        Span::styled("\u{23ce} select", theme::FOOTER_KEY),
-        Span::raw("  "),
-        Span::styled("? help", theme::FOOTER_KEY),
-        Span::raw("  "),
-        Span::styled("q quit", theme::FOOTER_KEY),
-    ]);
+fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
+    let hints: Vec<(&str, &str)> = match app.active_tab {
+        ActiveTab::Tokens if app.tokens_state.chain_picker_open => {
+            vec![
+                ("\u{2191}\u{2193}", "navigate"),
+                ("\u{23ce}", "select"),
+                ("Esc", "cancel"),
+            ]
+        }
+        ActiveTab::Tokens if app.tokens_state.input_mode == InputMode::Search => {
+            vec![
+                ("type", "filter"),
+                ("\u{2191}\u{2193}", "navigate"),
+                ("\u{23ce}", "confirm"),
+                ("Esc", "clear"),
+            ]
+        }
+        ActiveTab::Tokens => {
+            vec![
+                ("\u{2190}\u{2192}", "tabs"),
+                ("\u{2191}\u{2193}", "navigate"),
+                ("/", "search"),
+                ("c", "chain"),
+                ("q", "quit"),
+            ]
+        }
+        _ => {
+            vec![
+                ("\u{2190}\u{2192}", "tabs"),
+                ("\u{2191}\u{2193}", "navigate"),
+                ("\u{23ce}", "select"),
+                ("?", "help"),
+                ("q", "quit"),
+            ]
+        }
+    };
+
+    let spans: Vec<Span> = hints
+        .iter()
+        .enumerate()
+        .flat_map(|(i, (key, action))| {
+            let mut s = vec![Span::styled(
+                format!("{key} {action}"),
+                theme::FOOTER_KEY,
+            )];
+            if i < hints.len() - 1 {
+                s.push(Span::raw("  "));
+            }
+            s
+        })
+        .collect();
+
+    let mut line_spans = vec![Span::raw(" ")];
+    line_spans.extend(spans);
+    let footer = Line::from(line_spans);
 
     frame.render_widget(Paragraph::new(footer).style(theme::FOOTER_BG), area);
 }

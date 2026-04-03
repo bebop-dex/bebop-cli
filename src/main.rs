@@ -157,7 +157,7 @@ async fn main() {
         None => {
             use std::io::IsTerminal;
             if std::io::stdout().is_terminal() {
-                if let Err(e) = tui::run() {
+                if let Err(e) = tui::run().await {
                     eprintln!("TUI error: {e}");
                     std::process::exit(1);
                 }
