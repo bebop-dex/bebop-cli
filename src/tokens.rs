@@ -40,6 +40,7 @@ async fn fetch_all_tokens() -> Vec<TokenWithChain> {
             });
         }
     }
+    all.sort_by(|a, b| a.symbol.to_lowercase().cmp(&b.symbol.to_lowercase()));
     all
 }
 
@@ -60,16 +61,19 @@ async fn unknown_chain(chain: &str) -> ! {
 
 pub async fn fetch_tokens(chain: &str) -> Vec<Token> {
     let cache_key = format!("tokens_{chain}");
-    if let Some(cached) = crate::cache::read(&cache_key) {
-        return serde_json::from_str(&cached).expect("failed to parse cached tokens");
-    }
-    let url = format!("https://api.bebop.xyz/pmm/{chain}/v3/tokenlist");
-    let resp = reqwest::get(&url).await.expect("failed to fetch tokenlist");
-    if !resp.status().is_success() {
-        unknown_chain(chain).await;
-    }
-    let tokens = resp.json::<TokenList>().await.expect("failed to parse tokenlist response").tokens;
-    crate::cache::write(&cache_key, &serde_json::to_string(&tokens).unwrap());
+    let mut tokens = if let Some(cached) = crate::cache::read(&cache_key) {
+        serde_json::from_str(&cached).expect("failed to parse cached tokens")
+    } else {
+        let url = format!("https://api.bebop.xyz/pmm/{chain}/v3/tokenlist");
+        let resp = reqwest::get(&url).await.expect("failed to fetch tokenlist");
+        if !resp.status().is_success() {
+            unknown_chain(chain).await;
+        }
+        let tokens = resp.json::<TokenList>().await.expect("failed to parse tokenlist response").tokens;
+        crate::cache::write(&cache_key, &serde_json::to_string(&tokens).unwrap());
+        tokens
+    };
+    tokens.sort_by(|a, b| a.symbol.to_lowercase().cmp(&b.symbol.to_lowercase()));
     tokens
 }
 

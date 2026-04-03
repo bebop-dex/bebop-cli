@@ -5,6 +5,7 @@ mod chains;
 mod config;
 mod quote;
 mod tokens;
+mod update;
 
 #[derive(Parser)]
 #[command(version, about, arg_required_else_help = true)]
@@ -68,6 +69,8 @@ enum Commands {
     Config(ConfigArgs),
     /// MCP tool schema for AI agent discovery
     Manifest {},
+    /// Update bebop to the latest version
+    Update {},
 }
 
 #[derive(Args)]
@@ -145,6 +148,9 @@ async fn main() {
         Some(Commands::Token { query, chain }) => {
             let chain = require_chain(chain, &cfg);
             tokens::get(&query, &chain, &output).await;
+        }
+        Some(Commands::Update {}) => {
+            update::update();
         }
         _ => {}
     }

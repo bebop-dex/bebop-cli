@@ -2,7 +2,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use futures::future::join_all;
 use serde_json::json;
-use tabled::{Table, Tabled, settings::{Style, width::Width, peaker::Priority}};
+use tabled::{Table, Tabled, settings::{Style, width::Width, peaker::Priority, Remove, object::Columns}};
 
 use crate::OutputFormat;
 use crate::tokens::Token;
@@ -54,6 +54,14 @@ struct QuoteSummary {
     makers: String,
     #[tabled(rename = "Expires in")]
     ttl: String,
+    #[tabled(rename = "Error")]
+    error: String,
+}
+
+struct QuoteOutcome {
+    buy_label: String,
+    sell_label: String,
+    result: Result<QuoteApiResponse, String>,
 }
 
 async fn fetch_quote(
@@ -171,25 +179,27 @@ pub async fn quote(
 
     let results = join_all(futs).await;
 
-    let mut quotes = Vec::new();
-    for (result, (buy_label, sell_label)) in results.into_iter().zip(labels) {
-        match result {
-            Ok(q) => quotes.push(q),
-            Err(e) => eprintln!("\x1b[33mwarning: [{} → {}] {}\x1b[0m", sell_label, buy_label, e),
-        }
-    }
+    let outcomes: Vec<QuoteOutcome> = results
+        .into_iter()
+        .zip(labels)
+        .map(|(result, (buy_label, sell_label))| QuoteOutcome {
+            buy_label: buy_label.to_string(),
+            sell_label: sell_label.to_string(),
+            result,
+        })
+        .collect();
 
-    if quotes.is_empty() {
+    if outcomes.iter().all(|o| o.result.is_err()) {
         eprintln!("error: all quotes failed");
         std::process::exit(1);
     }
 
     match output {
         OutputFormat::Json => {
-            print_quotes_json(&quotes, authenticated);
+            print_quotes_json(&outcomes, authenticated);
         }
         OutputFormat::Text => {
-            print_quotes_text(&quotes);
+            print_quotes_text(&outcomes);
         }
     }
 }
@@ -239,8 +249,17 @@ fn quote_to_json(quote: &QuoteApiResponse) -> serde_json::Value {
     out
 }
 
-fn print_quotes_json(quotes: &[QuoteApiResponse], authenticated: bool) {
-    let items: Vec<serde_json::Value> = quotes.iter().map(quote_to_json).collect();
+fn print_quotes_json(outcomes: &[QuoteOutcome], authenticated: bool) {
+    let items: Vec<serde_json::Value> = outcomes.iter().map(|o| {
+        match &o.result {
+            Ok(quote) => quote_to_json(quote),
+            Err(e) => json!({
+                "sell": { "symbol": o.sell_label },
+                "buy": { "symbol": o.buy_label },
+                "error": e,
+            }),
+        }
+    }).collect();
 
     let mut out = json!({ "authenticated": authenticated, "quotes": items });
     if !authenticated {
@@ -281,8 +300,8 @@ fn align_decimal(s: &str, int_width: usize, decimals: usize) -> String {
     format!("{:>w$}.{}", int, padded_frac, w = int_width)
 }
 
-fn print_quotes_text(quotes: &[QuoteApiResponse]) {
-    // First pass: extract numeric data from each quote.
+fn print_quotes_text(outcomes: &[QuoteOutcome]) {
+    // First pass: extract numeric data from successful quotes.
     struct Row {
         sell_human: String,
         sell_symbol: String,
@@ -298,14 +317,18 @@ fn print_quotes_text(quotes: &[QuoteApiResponse]) {
         ttl: i64,
     }
 
-    let rows: Vec<Row> = quotes.iter().map(|q| {
+    let row_data: Vec<Option<Row>> = outcomes.iter().map(|o| {
+        let q = match &o.result {
+            Ok(q) => q,
+            Err(_) => return None,
+        };
         let sell = q.sell_tokens.values().next().expect("no sell token");
         let buy = q.buy_tokens.values().next().expect("no buy token");
         let sell_human = from_base_units(&sell.amount, sell.decimals);
         let buy_human = from_base_units(&buy.amount, buy.decimals);
         let sell_f = sell_human.parse::<f64>().unwrap_or(0.0);
         let buy_f = buy_human.parse::<f64>().unwrap_or(0.0);
-        Row {
+        Some(Row {
             sell_human,
             sell_symbol: sell.symbol.clone(),
             sell_usd: sell.price_usd,
@@ -318,58 +341,81 @@ fn print_quotes_text(quotes: &[QuoteApiResponse]) {
             price_impact: q.price_impact,
             makers: q.makers.join(" "),
             ttl: ttl_seconds(q.expiry),
-        }
+        })
     }).collect();
 
+    let successful_rows: Vec<&Row> = row_data.iter().filter_map(|r| r.as_ref()).collect();
+    let has_errors = outcomes.iter().any(|o| o.result.is_err());
+
     // Compute buy-amount decimal precision: max first-nonzero position, at least 5.
-    let buy_prec = rows.iter()
+    let buy_prec = successful_rows.iter()
         .map(|r| first_nonzero_decimal_pos(&r.buy_human))
         .max().unwrap_or(0).max(5);
 
-    let buy_int_w = rows.iter()
+    let buy_int_w = successful_rows.iter()
         .map(|r| integer_part_len(&format!("{:.prec$}", r.buy_f, prec = buy_prec)))
         .max().unwrap_or(1);
 
     // Compute rate decimal precision the same way.
-    let rate_prec = rows.iter()
+    let rate_prec = successful_rows.iter()
         .filter_map(|r| r.rate.map(|v| first_nonzero_decimal_pos(&format!("{:.20}", v))))
         .max().unwrap_or(0).max(5);
 
-    let rate_int_w = rows.iter()
+    let rate_int_w = successful_rows.iter()
         .filter_map(|r| r.rate.map(|v| integer_part_len(&format!("{:.prec$}", v, prec = rate_prec))))
         .max().unwrap_or(1);
 
     // Second pass: build aligned display rows.
-    let summary: Vec<QuoteSummary> = rows.iter().map(|r| {
-        let buy_fmt = format!("{:.prec$}", r.buy_f, prec = buy_prec);
-        let buy_aligned = align_decimal(&buy_fmt, buy_int_w, buy_prec);
-        let buy_str = match r.buy_usd {
-            Some(p) => format!("{} {} (${:.2})", buy_aligned, r.buy_symbol, p * r.buy_f),
-            None => format!("{} {}", buy_aligned, r.buy_symbol),
-        };
+    let summary: Vec<QuoteSummary> = outcomes.iter().zip(row_data.iter()).map(|(o, row_opt)| {
+        match row_opt {
+            Some(r) => {
+                let buy_fmt = format!("{:.prec$}", r.buy_f, prec = buy_prec);
+                let buy_aligned = align_decimal(&buy_fmt, buy_int_w, buy_prec);
+                let buy_str = match r.buy_usd {
+                    Some(p) => format!("{} {} (${:.2})", buy_aligned, r.buy_symbol, p * r.buy_f),
+                    None => format!("{} {}", buy_aligned, r.buy_symbol),
+                };
 
-        let rate_str = match r.rate {
-            Some(v) => {
-                let rate_fmt = format!("{:.prec$}", v, prec = rate_prec);
-                let rate_aligned = align_decimal(&rate_fmt, rate_int_w, rate_prec);
-                format!("1 {} = {} {}", r.sell_symbol, rate_aligned, r.buy_symbol)
+                let rate_str = match r.rate {
+                    Some(v) => {
+                        let rate_fmt = format!("{:.prec$}", v, prec = rate_prec);
+                        let rate_aligned = align_decimal(&rate_fmt, rate_int_w, rate_prec);
+                        format!("1 {} = {} {}", r.sell_symbol, rate_aligned, r.buy_symbol)
+                    }
+                    None => "-".to_string(),
+                };
+
+                QuoteSummary {
+                    sell: match r.sell_usd {
+                        Some(p) => format!("{} {} (${:.2})", r.sell_human, r.sell_symbol, p * r.sell_f),
+                        None => format!("{} {}", r.sell_human, r.sell_symbol),
+                    },
+                    buy: buy_str,
+                    rate: rate_str,
+                    impact: match r.price_impact {
+                        Some(i) => format!("{:.4}%", i * 100.0),
+                        None => "-".to_string(),
+                    },
+                    makers: r.makers.clone(),
+                    ttl: format!("{}s", r.ttl),
+                    error: String::new(),
+                }
             }
-            None => "-".to_string(),
-        };
-
-        QuoteSummary {
-            sell: match r.sell_usd {
-                Some(p) => format!("{} {} (${:.2})", r.sell_human, r.sell_symbol, p * r.sell_f),
-                None => format!("{} {}", r.sell_human, r.sell_symbol),
-            },
-            buy: buy_str,
-            rate: rate_str,
-            impact: match r.price_impact {
-                Some(i) => format!("{:.4}%", i * 100.0),
-                None => "-".to_string(),
-            },
-            makers: r.makers.clone(),
-            ttl: format!("{}s", r.ttl),
+            None => {
+                let error_msg = match &o.result {
+                    Err(e) => e.clone(),
+                    _ => unreachable!(),
+                };
+                QuoteSummary {
+                    sell: o.sell_label.clone(),
+                    buy: o.buy_label.clone(),
+                    rate: "-".to_string(),
+                    impact: "-".to_string(),
+                    makers: "-".to_string(),
+                    ttl: "-".to_string(),
+                    error: error_msg,
+                }
+            }
         }
     }).collect();
 
@@ -379,12 +425,17 @@ fn print_quotes_text(quotes: &[QuoteApiResponse]) {
 
     let mut table = Table::new(summary);
     table.with(Style::rounded());
+    if !has_errors {
+        table.with(Remove::column(Columns::last()));
+    }
     table.with(Width::wrap(term_width).priority(Priority::max(false)).keep_words(true));
     println!("{}", table);
 
-    for q in quotes {
-        for w in &q.warnings {
-            eprintln!("\x1b[33mwarning: {}\x1b[0m", w.message);
+    for o in outcomes {
+        if let Ok(q) = &o.result {
+            for w in &q.warnings {
+                eprintln!("\x1b[33mwarning: {}\x1b[0m", w.message);
+            }
         }
     }
 }
