@@ -147,7 +147,13 @@ pub async fn quote(
         std::process::exit(1);
     }
 
+    let spinner = indicatif::ProgressBar::new_spinner();
+    spinner.set_message("Fetching tokens...");
+    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+
     let tokens = crate::tokens::fetch_tokens(chain).await;
+
+    spinner.set_message("Fetching quotes...");
 
     let buy_tokens: Vec<&Token> = buys.iter().map(|b| crate::tokens::resolve(b, &tokens)).collect();
     let sell_tokens: Vec<&Token> = sells.iter().map(|s| crate::tokens::resolve(s, &tokens)).collect();
@@ -176,10 +182,6 @@ pub async fn quote(
         futs.push(Box::pin(fetch_quote(buy_tokens[0], sell_tokens[0], ab, as_, chain, wallet_address, api_key)));
         labels.push((&buys[0], &sells[0]));
     }
-
-    let spinner = indicatif::ProgressBar::new_spinner();
-    spinner.set_message("Fetching quotes...");
-    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
 
     let results = join_all(futs).await;
 
