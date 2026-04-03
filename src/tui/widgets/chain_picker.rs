@@ -1,4 +1,4 @@
-use ratatui::layout::{Constraint, Flex, Layout, Rect};
+use ratatui::layout::Rect;
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState};
 use ratatui::Frame;
 
@@ -8,7 +8,7 @@ use crate::tui::state::tokens_state::TokensState;
 pub fn render(frame: &mut Frame, area: Rect, state: &TokensState) {
     let popup_width = 30u16.min(area.width.saturating_sub(4));
     let popup_height = (state.chains.len() as u16 + 2).min(area.height.saturating_sub(4)).max(3);
-    let popup_area = centered_rect(popup_width, popup_height, area);
+    let popup_area = super::centered_rect(popup_width, popup_height, area);
 
     frame.render_widget(Clear, popup_area);
 
@@ -32,12 +32,3 @@ pub fn render(frame: &mut Frame, area: Rect, state: &TokensState) {
     frame.render_stateful_widget(list, popup_area, &mut list_state);
 }
 
-fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
-    let vertical = Layout::vertical([Constraint::Length(height)])
-        .flex(Flex::Center)
-        .split(area);
-    let horizontal = Layout::horizontal([Constraint::Length(width)])
-        .flex(Flex::Center)
-        .split(vertical[0]);
-    horizontal[0]
-}

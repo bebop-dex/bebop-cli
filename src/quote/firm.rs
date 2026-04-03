@@ -8,7 +8,7 @@ use crate::OutputFormat;
 use crate::tokens::Token;
 use super::types::{QuoteApiResponse, ErrorApiResponse};
 
-fn to_base_units(human_amount: &str, decimals: u8) -> String {
+pub(crate) fn to_base_units(human_amount: &str, decimals: u8) -> String {
     let parts: Vec<&str> = human_amount.split('.').collect();
     let integer = parts[0];
     let fraction = if parts.len() > 1 { parts[1] } else { "" };
@@ -24,7 +24,7 @@ fn to_base_units(human_amount: &str, decimals: u8) -> String {
     if trimmed.is_empty() { "0".to_string() } else { trimmed.to_string() }
 }
 
-fn from_base_units(base_amount: &str, decimals: u8) -> String {
+pub(crate) fn from_base_units(base_amount: &str, decimals: u8) -> String {
     let d = decimals as usize;
     let padded = if base_amount.len() <= d {
         format!("{}{}", "0".repeat(d - base_amount.len() + 1), base_amount)
@@ -64,7 +64,7 @@ struct QuoteOutcome {
     result: Result<QuoteApiResponse, String>,
 }
 
-async fn fetch_quote(
+pub(crate) async fn fetch_quote(
     buy_token: &Token,
     sell_token: &Token,
     amount_buy: Option<&str>,
@@ -211,7 +211,7 @@ pub async fn quote(
     }
 }
 
-fn ttl_seconds(expiry: u64) -> i64 {
+pub(crate) fn ttl_seconds(expiry: u64) -> i64 {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()

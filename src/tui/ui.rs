@@ -72,9 +72,7 @@ fn render_content(frame: &mut Frame, area: Rect, app: &mut App) {
             super::tabs::tokens::render(frame, area, app);
         }
         ActiveTab::Quote => {
-            let content = Paragraph::new("Quote \u{2014} RFQ interface coming soon")
-                .style(theme::CONTENT_TEXT);
-            frame.render_widget(content, area);
+            super::tabs::quote::render(frame, area, app);
         }
         ActiveTab::Config => {
             let content = Paragraph::new("Config \u{2014} settings editor coming soon")
@@ -86,6 +84,7 @@ fn render_content(frame: &mut Frame, area: Rect, app: &mut App) {
 
 fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
     let hints: Vec<(&str, &str)> = match app.active_tab {
+        // Tokens tab
         ActiveTab::Tokens if app.tokens_state.chain_picker_open => {
             vec![
                 ("\u{2191}\u{2193}", "navigate"),
@@ -110,6 +109,53 @@ fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
                 ("q", "quit"),
             ]
         }
+
+        // Quote tab — modals
+        ActiveTab::Quote if app.quote_state.delete_confirm => {
+            vec![("y", "delete"), ("n/Esc", "cancel")]
+        }
+        ActiveTab::Quote if app.quote_state.chain_picker_open => {
+            vec![
+                ("\u{2191}\u{2193}", "navigate"),
+                ("\u{23ce}", "select"),
+                ("Esc", "cancel"),
+            ]
+        }
+        ActiveTab::Quote if app.quote_state.token_search.open => {
+            vec![
+                ("type", "filter"),
+                ("\u{2191}\u{2193}", "navigate"),
+                ("\u{23ce}", "select"),
+                ("Esc", "cancel"),
+            ]
+        }
+        ActiveTab::Quote if app.quote_state.amount_editing => {
+            vec![
+                ("type", "enter amount"),
+                ("\u{23ce}", "confirm"),
+                ("Esc", "cancel"),
+            ]
+        }
+        ActiveTab::Quote if app.quote_state.form_open => {
+            vec![
+                ("\u{2191}\u{2193}", "fields"),
+                ("\u{23ce}", "select"),
+                ("c", "chain"),
+                ("Esc", "close"),
+            ]
+        }
+        // Quote tab — table view
+        ActiveTab::Quote => {
+            vec![
+                ("\u{2190}\u{2192}", "tabs"),
+                ("\u{2191}\u{2193}", "navigate"),
+                ("n", "new quote"),
+                ("d", "delete"),
+                ("q", "quit"),
+            ]
+        }
+
+        // Default
         _ => {
             vec![
                 ("\u{2190}\u{2192}", "tabs"),

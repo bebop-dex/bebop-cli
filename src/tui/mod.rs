@@ -8,7 +8,7 @@ pub mod widgets;
 
 use app::App;
 use message::AppMessage;
-use state::tokens_state::LoadState;
+use state::LoadState;
 
 pub async fn run() -> std::io::Result<()> {
     let mut terminal = ratatui::init();
@@ -34,6 +34,12 @@ fn run_loop(
 
         if app.tokens_state.load_state == LoadState::Loading {
             app.tokens_state.spinner_tick = app.tokens_state.spinner_tick.wrapping_add(1);
+        }
+
+        if app.quote_state.quote_load_state == LoadState::Loading
+            || app.quote_state.form_tokens_load_state == LoadState::Loading
+        {
+            app.quote_state.spinner_tick = app.quote_state.spinner_tick.wrapping_add(1);
         }
     }
     Ok(())

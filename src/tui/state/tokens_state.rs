@@ -1,12 +1,6 @@
 use crate::tokens::Token;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LoadState {
-    Idle,
-    Loading,
-    Loaded,
-    Error(String),
-}
+pub use super::LoadState;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputMode {
