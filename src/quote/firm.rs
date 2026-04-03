@@ -177,7 +177,13 @@ pub async fn quote(
         labels.push((&buys[0], &sells[0]));
     }
 
+    let spinner = indicatif::ProgressBar::new_spinner();
+    spinner.set_message("Fetching quotes...");
+    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+
     let results = join_all(futs).await;
+
+    spinner.finish_and_clear();
 
     let outcomes: Vec<QuoteOutcome> = results
         .into_iter()

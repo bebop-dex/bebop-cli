@@ -106,8 +106,13 @@ pub fn resolve<'a>(query: &str, tokens: &'a [Token]) -> &'a Token {
 }
 
 pub async fn get(query: &str, chain: &str, output: &OutputFormat) {
+    let spinner = indicatif::ProgressBar::new_spinner();
+    spinner.set_message("Fetching tokens...");
+    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+
     if chain == "all" {
         let all = fetch_all_tokens().await;
+        spinner.finish_and_clear();
         let q = query.to_lowercase();
         let is_address = q.starts_with("0x");
         let matches: Vec<&TokenWithChain> = all.iter().filter(|t| {
@@ -146,6 +151,7 @@ pub async fn get(query: &str, chain: &str, output: &OutputFormat) {
     }
 
     let tokens = fetch_tokens(chain).await;
+    spinner.finish_and_clear();
     let t = resolve(query, &tokens);
     match output {
         OutputFormat::Json => {
@@ -166,8 +172,13 @@ pub async fn get(query: &str, chain: &str, output: &OutputFormat) {
 }
 
 pub async fn list(chain: &str, search: Option<&str>, output: &OutputFormat) {
+    let spinner = indicatif::ProgressBar::new_spinner();
+    spinner.set_message("Fetching tokens...");
+    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+
     if chain == "all" {
         let all = fetch_all_tokens().await;
+        spinner.finish_and_clear();
 
         let tokens: Vec<&TokenWithChain> = all.iter().filter(|t| {
             if let Some(q) = search {
@@ -203,6 +214,7 @@ pub async fn list(chain: &str, search: Option<&str>, output: &OutputFormat) {
     }
 
     let all = fetch_tokens(chain).await;
+    spinner.finish_and_clear();
 
     let tokens: Vec<&Token> = all.iter().filter(|t| {
         if let Some(q) = search {

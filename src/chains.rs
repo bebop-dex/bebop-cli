@@ -25,7 +25,13 @@ pub async fn fetch() -> BTreeMap<String, u64> {
 }
 
 pub async fn list(output: &OutputFormat) {
+    let spinner = indicatif::ProgressBar::new_spinner();
+    spinner.set_message("Fetching chains...");
+    spinner.enable_steady_tick(std::time::Duration::from_millis(80));
+
     let chains = fetch().await;
+
+    spinner.finish_and_clear();
     match output {
         OutputFormat::Json => {
             println!("{}", serde_json::to_string_pretty(&chains).unwrap());
