@@ -109,7 +109,10 @@ fn render_table(frame: &mut Frame, area: Rect, app: &mut App) {
             let row_style = if i == app.quote_state.table_selected {
                 theme::QUOTE_TABLE_SELECTED
             } else {
-                theme::QUOTE_TABLE_ROW
+                match &entry.status {
+                    QuoteEntryStatus::Active => theme::QUOTE_TABLE_ROW,
+                    _ => theme::QUOTE_TABLE_DIMMED,
+                }
             };
 
             Row::new(vec![

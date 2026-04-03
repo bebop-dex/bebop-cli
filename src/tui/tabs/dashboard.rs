@@ -1,9 +1,12 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 
 use crate::tui::app::App;
+use crate::tui::state::quote_state::QuoteEntryStatus;
 use crate::tui::state::theme;
 
 pub fn render(frame: &mut Frame, area: Rect, app: &App) {
@@ -14,7 +17,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     .split(area);
 
     render_left_panel(frame, columns[0], app);
-    render_quotes_preview(frame, columns[1]);
+    render_quotes_preview(frame, columns[1], app);
 }
 
 fn render_left_panel(frame: &mut Frame, area: Rect, app: &App) {
@@ -101,26 +104,89 @@ fn render_config_summary(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(Paragraph::new(lines), rows[1]);
 }
 
-fn render_quotes_preview(frame: &mut Frame, area: Rect) {
+fn render_quotes_preview(frame: &mut Frame, area: Rect, app: &App) {
+    let count = app.quote_state.entries.len();
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(theme::DASHBOARD_BORDER)
-        .title(" Active Quotes ");
+        .title(format!(" Active Quotes ({count}) "));
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let placeholder = Paragraph::new("No active quotes")
-        .style(theme::CONTENT_TEXT)
-        .alignment(Alignment::Center);
+    if count == 0 {
+        let placeholder = Paragraph::new("No active quotes")
+            .style(theme::CONTENT_TEXT)
+            .alignment(Alignment::Center);
+        let v = Layout::vertical([
+            Constraint::Fill(1),
+            Constraint::Length(1),
+            Constraint::Fill(1),
+        ])
+        .split(inner);
+        frame.render_widget(placeholder, v[1]);
+        return;
+    }
 
-    let v = Layout::vertical([
-        Constraint::Fill(1),
-        Constraint::Length(1),
-        Constraint::Fill(1),
-    ])
-    .split(inner);
-    frame.render_widget(placeholder, v[1]);
+    let now_secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let mut lines: Vec<Line> = app
+        .quote_state
+        .entries
+        .iter()
+        .take(5)
+        .map(|entry| {
+            let ttl = entry.expiry as i64 - now_secs as i64;
+
+            let status_icon = match &entry.status {
+                QuoteEntryStatus::Active if ttl > 0 => "\u{2713}",
+                QuoteEntryStatus::Active => "\u{23f3}",
+                QuoteEntryStatus::Expired => "\u{23f3}",
+                QuoteEntryStatus::Error(_) => "\u{26a0}",
+            };
+
+            let rate_str = match entry.rate {
+                Some(r) => format!("{:.4}", r),
+                None => "---".to_string(),
+            };
+
+            let ttl_str = if ttl > 0 {
+                format!("{}s", ttl)
+            } else {
+                "exp".to_string()
+            };
+
+            let style = match &entry.status {
+                QuoteEntryStatus::Active if ttl > 0 => theme::DASHBOARD_VALUE,
+                _ => theme::DASHBOARD_LABEL,
+            };
+
+            Line::from(vec![
+                Span::styled(format!("  {status_icon} "), style),
+                Span::styled(
+                    format!(
+                        "{} \u{2192} {:<16}",
+                        entry.sell_token.symbol, entry.buy_token.symbol
+                    ),
+                    style,
+                ),
+                Span::styled(format!("rate: {rate_str:<12}"), style),
+                Span::styled(format!("ttl: {ttl_str}"), style),
+            ])
+        })
+        .collect();
+
+    if count > 5 {
+        lines.push(Line::from(Span::styled(
+            format!("  ... and {} more", count - 5),
+            theme::DASHBOARD_LABEL,
+        )));
+    }
+
+    frame.render_widget(Paragraph::new(lines), inner);
 }
 
 fn truncate_address(addr: &str) -> String {

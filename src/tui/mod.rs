@@ -1,6 +1,7 @@
 pub mod app;
 pub mod event;
 pub mod message;
+pub mod quote_store;
 pub mod state;
 pub mod tabs;
 pub mod ui;
@@ -13,7 +14,23 @@ use state::LoadState;
 pub async fn run() -> std::io::Result<()> {
     let mut terminal = ratatui::init();
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-    let mut app = App::new(tx);
+    let mut app = App::new(tx.clone());
+
+    // Load persisted quotes and fire initial re-quotes
+    app.load_persisted_quotes();
+
+    // Spawn the 15-second auto-refresh timer
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(15));
+        interval.tick().await; // consume the immediate first tick
+        loop {
+            interval.tick().await;
+            if tx.send(AppMessage::RefreshTick).is_err() {
+                break;
+            }
+        }
+    });
+
     let result = run_loop(&mut terminal, &mut app, rx);
     ratatui::restore();
     result

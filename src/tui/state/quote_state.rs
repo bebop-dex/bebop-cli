@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 use crate::tokens::Token;
 
 use super::LoadState;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum QuoteSide {
     Sell,
     Buy,
@@ -61,9 +63,7 @@ pub enum TokenSearchTarget {
 #[derive(Debug, Clone, PartialEq)]
 pub enum QuoteEntryStatus {
     Active,
-    #[allow(dead_code)] // used in epoch 4 (auto-refresh)
     Expired,
-    #[allow(dead_code)] // used in epoch 4 (auto-refresh errors)
     Error(String),
 }
 
@@ -170,6 +170,11 @@ impl TokenSearchState {
 }
 
 pub struct QuoteEntry {
+    // Request params (persisted)
+    pub request_amount: String,
+    pub request_side: QuoteSide,
+
+    // Response data (transient)
     pub sell_token: Token,
     pub buy_token: Token,
     pub sell_amount: String,

@@ -260,6 +260,121 @@ impl App {
         });
     }
 
+    // --- Persistence & auto-refresh ---
+
+    pub fn load_persisted_quotes(&mut self) {
+        let persisted = super::quote_store::load();
+        for pq in &persisted {
+            self.quote_state.entries.push(QuoteEntry {
+                request_amount: pq.amount.clone(),
+                request_side: pq.side,
+                sell_token: pq.sell_token.clone(),
+                buy_token: pq.buy_token.clone(),
+                sell_amount: "---".to_string(),
+                buy_amount: "---".to_string(),
+                rate: None,
+                price_impact: None,
+                expiry: 0,
+                chain: pq.chain.clone(),
+                status: QuoteEntryStatus::Expired,
+            });
+        }
+        if !self.quote_state.entries.is_empty() {
+            self.refresh_all_quotes();
+        }
+    }
+
+    pub fn refresh_all_quotes(&self) {
+        let wallet = self
+            .config
+            .wallet_address
+            .clone()
+            .unwrap_or_else(|| "0x0000000000000000000000000000000000000000".to_string());
+        let api_key = self.config.api_key.clone();
+
+        for (index, entry) in self.quote_state.entries.iter().enumerate() {
+            let tx = self.tx.clone();
+            let sell_token = entry.sell_token.clone();
+            let buy_token = entry.buy_token.clone();
+            let amount = entry.request_amount.clone();
+            let side = entry.request_side;
+            let chain = entry.chain.clone();
+            let wallet = wallet.clone();
+            let api_key = api_key.clone();
+
+            tokio::spawn(async move {
+                use crate::quote::firm::{fetch_quote, from_base_units};
+                use super::state::quote_state::QuoteSide;
+
+                let (amount_buy, amount_sell) = match side {
+                    QuoteSide::Sell => (None, Some(amount.as_str())),
+                    QuoteSide::Buy => (Some(amount.as_str()), None),
+                };
+
+                match fetch_quote(
+                    &buy_token,
+                    &sell_token,
+                    amount_buy,
+                    amount_sell,
+                    &chain,
+                    &wallet,
+                    api_key.as_deref(),
+                )
+                .await
+                {
+                    Ok(response) => {
+                        let sell_resp = response.sell_tokens.values().next();
+                        let buy_resp = response.buy_tokens.values().next();
+                        if let (Some(sr), Some(br)) = (sell_resp, buy_resp) {
+                            let sell_amount = from_base_units(&sr.amount, sr.decimals);
+                            let buy_amount = from_base_units(&br.amount, br.decimals);
+                            let sell_f = sell_amount.parse::<f64>().unwrap_or(0.0);
+                            let buy_f = buy_amount.parse::<f64>().unwrap_or(0.0);
+                            let rate = if sell_f > 0.0 { Some(buy_f / sell_f) } else { None };
+
+                            let _ = tx.send(AppMessage::RefreshQuoteLoaded {
+                                index,
+                                sell_amount,
+                                buy_amount,
+                                rate,
+                                price_impact: response.price_impact,
+                                expiry: response.expiry,
+                            });
+                        } else {
+                            let _ = tx.send(AppMessage::RefreshQuoteError {
+                                index,
+                                error: "Missing token data in response".to_string(),
+                            });
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(AppMessage::RefreshQuoteError {
+                            index,
+                            error: e,
+                        });
+                    }
+                }
+            });
+        }
+    }
+
+    pub fn save_quotes(&self) {
+        use super::quote_store::PersistedQuote;
+        let persisted: Vec<PersistedQuote> = self
+            .quote_state
+            .entries
+            .iter()
+            .map(|e| PersistedQuote {
+                sell_token: e.sell_token.clone(),
+                buy_token: e.buy_token.clone(),
+                amount: e.request_amount.clone(),
+                side: e.request_side,
+                chain: e.chain.clone(),
+            })
+            .collect();
+        super::quote_store::save(&persisted);
+    }
+
     // --- Message handling ---
 
     pub fn handle_message(&mut self, msg: AppMessage) {
@@ -312,7 +427,11 @@ impl App {
                 expiry,
                 chain,
             } => {
+                let request_amount = self.quote_state.amount.clone();
+                let request_side = self.quote_state.side;
                 self.quote_state.entries.push(QuoteEntry {
+                    request_amount,
+                    request_side,
                     sell_token,
                     buy_token,
                     sell_amount,
@@ -327,10 +446,52 @@ impl App {
                 self.quote_state.table_selected = self.quote_state.entries.len().saturating_sub(1);
                 self.quote_state.form_open = false;
                 self.quote_state.clear_form();
+                self.save_quotes();
             }
             AppMessage::QuoteError { error } => {
                 self.quote_state.quote_load_state = LoadState::Error(error.clone());
                 self.quote_state.quote_error = Some(error);
+            }
+
+            // Auto-refresh
+            AppMessage::RefreshTick => {
+                let now_secs = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                for entry in &mut self.quote_state.entries {
+                    if entry.status == QuoteEntryStatus::Active
+                        && (entry.expiry as i64 - now_secs as i64) <= 0
+                    {
+                        entry.status = QuoteEntryStatus::Expired;
+                    }
+                }
+                if !self.quote_state.entries.is_empty() {
+                    self.refresh_all_quotes();
+                }
+            }
+            AppMessage::RefreshQuoteLoaded {
+                index,
+                sell_amount,
+                buy_amount,
+                rate,
+                price_impact,
+                expiry,
+            } => {
+                if let Some(entry) = self.quote_state.entries.get_mut(index) {
+                    entry.sell_amount = sell_amount;
+                    entry.buy_amount = buy_amount;
+                    entry.rate = rate;
+                    entry.price_impact = price_impact;
+                    entry.expiry = expiry;
+                    entry.status = QuoteEntryStatus::Active;
+                }
+                self.save_quotes();
+            }
+            AppMessage::RefreshQuoteError { index, error } => {
+                if let Some(entry) = self.quote_state.entries.get_mut(index) {
+                    entry.status = QuoteEntryStatus::Error(error);
+                }
             }
         }
     }

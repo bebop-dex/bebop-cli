@@ -188,6 +188,7 @@ fn handle_quote_delete_confirm(app: &mut App, key: KeyEvent) {
                 }
             }
             app.quote_state.delete_confirm = false;
+            app.save_quotes();
         }
         KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
             app.quote_state.delete_confirm = false;

@@ -73,6 +73,8 @@ pub const QUOTE_TABLE_SELECTED: Style = Style::new()
     .fg(Color::Cyan)
     .add_modifier(Modifier::BOLD);
 
+pub const QUOTE_TABLE_DIMMED: Style = Style::new().fg(Color::DarkGray);
+
 // Quote tab — price impact
 pub const QUOTE_IMPACT_LOW: Style = Style::new().fg(Color::Green);
 pub const QUOTE_IMPACT_MED: Style = Style::new().fg(Color::Yellow);
