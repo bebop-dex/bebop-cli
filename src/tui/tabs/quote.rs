@@ -257,6 +257,15 @@ fn render_form_modal(frame: &mut Frame, area: Rect, app: &App) {
     ]);
     frame.render_widget(Paragraph::new(side_line), rows[4]);
 
+    // Config warning
+    if app.config.api_key.is_none() {
+        let warn = Line::from(vec![
+            Span::raw(" "),
+            Span::styled("\u{26a0} No API key configured", theme::WARNING_TEXT),
+        ]);
+        frame.render_widget(Paragraph::new(warn), rows[5]);
+    }
+
     // Submit / status
     let submit_line = if app.quote_state.quote_load_state == LoadState::Loading {
         Line::from(vec![
@@ -289,6 +298,31 @@ fn render_form_modal(frame: &mut Frame, area: Rect, app: &App) {
         ])
     };
     frame.render_widget(Paragraph::new(submit_line), rows[6]);
+
+    // Inline validation when focused on Submit
+    if app.quote_state.active_field == FormField::Submit && !app.quote_state.can_submit() {
+        let missing: Vec<&str> = [
+            app.quote_state.sell_token.is_none().then_some("sell token"),
+            app.quote_state.buy_token.is_none().then_some("buy token"),
+            app.quote_state.amount.is_empty().then_some("amount"),
+            (!app.quote_state.amount.is_empty()
+                && app.quote_state
+                    .amount
+                    .parse::<f64>()
+                    .map(|v| v <= 0.0)
+                    .unwrap_or(true))
+            .then_some("valid amount"),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+
+        if !missing.is_empty() {
+            let msg = format!(" Missing: {}", missing.join(", "));
+            let line = Line::from(Span::styled(msg, theme::WARNING_TEXT));
+            frame.render_widget(Paragraph::new(line), rows[7]);
+        }
+    }
 }
 
 fn render_quote_chain_picker(frame: &mut Frame, area: Rect, app: &App) {

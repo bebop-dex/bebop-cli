@@ -1,7 +1,7 @@
 pub mod chain_picker;
 pub mod spinner;
 pub mod token_search;
-// pub mod help_overlay;
+pub mod help_overlay;
 
 use ratatui::layout::{Constraint, Flex, Layout, Rect};
 

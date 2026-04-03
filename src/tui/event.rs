@@ -22,6 +22,20 @@ pub fn handle_events(app: &mut App) -> std::io::Result<()> {
 }
 
 fn handle_key(app: &mut App, key: KeyEvent) {
+    // Help overlay intercepts all keys when open
+    if app.help_overlay_open {
+        match key.code {
+            KeyCode::Char('?') | KeyCode::Esc => {
+                app.help_overlay_open = false;
+                app.help_scroll_offset = 0;
+            }
+            KeyCode::Up => app.help_scroll_offset = app.help_scroll_offset.saturating_sub(1),
+            KeyCode::Down => app.help_scroll_offset += 1,
+            _ => {}
+        }
+        return;
+    }
+
     // Layer 0: Global chain picker (Shift+C from any tab)
     if app.config_state.global_chain_picker {
         handle_global_chain_picker_key(app, key);
@@ -109,6 +123,10 @@ fn handle_key(app: &mut App, key: KeyEvent) {
             {
                 app.config_state.chain_picker_index = pos;
             }
+        }
+        KeyCode::Char('?') => {
+            app.help_overlay_open = true;
+            app.help_scroll_offset = 0;
         }
         _ => {}
     }

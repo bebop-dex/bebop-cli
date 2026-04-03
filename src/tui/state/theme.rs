@@ -105,3 +105,11 @@ pub const TOKEN_SEARCH_HIGHLIGHT: Style = Style::new()
     .bg(Color::DarkGray)
     .fg(Color::Cyan)
     .add_modifier(Modifier::BOLD);
+
+// Help overlay
+pub const HELP_BORDER: Style = Style::new().fg(Color::Cyan);
+pub const HELP_TITLE: Style = Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD);
+pub const HELP_SECTION: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD);
+pub const HELP_KEY: Style = Style::new().fg(Color::Cyan);
+pub const HELP_DESC: Style = Style::new().fg(Color::White);
+pub const WARNING_TEXT: Style = Style::new().fg(Color::Yellow);

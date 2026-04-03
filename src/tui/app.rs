@@ -60,6 +60,8 @@ pub struct App {
     pub quote_state: QuoteState,
     pub config_state: ConfigState,
     pub tx: UnboundedSender<AppMessage>,
+    pub help_overlay_open: bool,
+    pub help_scroll_offset: usize,
 }
 
 impl App {
@@ -76,6 +78,8 @@ impl App {
             quote_state,
             config_state,
             tx,
+            help_overlay_open: false,
+            help_scroll_offset: 0,
         }
     }
 

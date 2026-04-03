@@ -20,6 +20,44 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     render_tab_bar(frame, chunks[1], app.active_tab);
     render_content(frame, chunks[2], app);
     render_footer(frame, chunks[3], app);
+
+    // Global chain picker — render on non-Config tabs (Config tab handles it internally)
+    if app.config_state.global_chain_picker && app.active_tab != ActiveTab::Config {
+        render_global_chain_picker(frame, frame.area(), app);
+    }
+
+    if app.help_overlay_open {
+        super::widgets::help_overlay::render(frame, frame.area(), app.help_scroll_offset);
+    }
+}
+
+fn render_global_chain_picker(frame: &mut Frame, area: Rect, app: &App) {
+    use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState};
+
+    let chains = &app.config_state.chains;
+    let popup_width = 30u16.min(area.width.saturating_sub(4));
+    let popup_height = (chains.len() as u16 + 2)
+        .min(area.height.saturating_sub(4))
+        .max(3);
+    let popup_area = super::widgets::centered_rect(popup_width, popup_height, area);
+
+    frame.render_widget(Clear, popup_area);
+
+    let items: Vec<ListItem> = chains.iter().map(|c| ListItem::new(c.as_str())).collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(theme::CHAIN_PICKER_BORDER)
+                .title(" Global Chain "),
+        )
+        .highlight_style(theme::CHAIN_PICKER_HIGHLIGHT)
+        .highlight_symbol("\u{25b8} ");
+
+    let mut list_state =
+        ListState::default().with_selected(Some(app.config_state.chain_picker_index));
+    frame.render_stateful_widget(list, popup_area, &mut list_state);
 }
 
 fn render_header(frame: &mut Frame, area: Rect, app: &App) {
@@ -81,7 +119,14 @@ fn render_content(frame: &mut Frame, area: Rect, app: &mut App) {
 }
 
 fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
-    let hints: Vec<(&str, &str)> = match app.active_tab {
+    let hints: Vec<(&str, &str)> = if app.config_state.global_chain_picker {
+        vec![
+            ("\u{2191}\u{2193}", "navigate"),
+            ("\u{23ce}", "select"),
+            ("Esc", "cancel"),
+        ]
+    } else {
+    match app.active_tab {
         // Tokens tab
         ActiveTab::Tokens if app.tokens_state.chain_picker_open => {
             vec![
@@ -106,6 +151,7 @@ fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
                 ("c", "chain"),
                 ("s", "sell"),
                 ("b", "buy"),
+                ("?", "help"),
                 ("q", "quit"),
             ]
         }
@@ -151,14 +197,13 @@ fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
                 ("\u{2191}\u{2193}", "navigate"),
                 ("n", "new quote"),
                 ("d", "delete"),
+                ("?", "help"),
                 ("q", "quit"),
             ]
         }
 
         // Config tab
-        ActiveTab::Config
-            if app.config_state.chain_picker_open || app.config_state.global_chain_picker =>
-        {
+        ActiveTab::Config if app.config_state.chain_picker_open => {
             vec![
                 ("\u{2191}\u{2193}", "navigate"),
                 ("\u{23ce}", "select"),
@@ -177,20 +222,21 @@ fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
                 ("\u{2190}\u{2192}", "tabs"),
                 ("\u{2191}\u{2193}", "fields"),
                 ("\u{23ce}", "edit"),
-                ("q", "quit"),
-            ]
-        }
-
-        // Default
-        _ => {
-            vec![
-                ("\u{2190}\u{2192}", "tabs"),
-                ("\u{2191}\u{2193}", "navigate"),
-                ("\u{23ce}", "select"),
                 ("?", "help"),
                 ("q", "quit"),
             ]
         }
+
+        // Dashboard
+        ActiveTab::Dashboard => {
+            vec![
+                ("\u{2190}\u{2192}", "tabs"),
+                ("Shift+C", "chain"),
+                ("?", "help"),
+                ("q", "quit"),
+            ]
+        }
+    }
     };
 
     let spans: Vec<Span> = hints

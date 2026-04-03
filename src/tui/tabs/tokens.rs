@@ -112,6 +112,23 @@ fn truncate_address(addr: &str) -> String {
 fn render_token_table(frame: &mut Frame, area: Rect, app: &mut App) {
     let state = &app.tokens_state;
 
+    if state.filtered_indices.is_empty() {
+        let msg = if state.search_query.is_empty() {
+            "  No tokens available for this chain"
+        } else {
+            "  No tokens match your search"
+        };
+        let paragraph = Paragraph::new(msg)
+            .style(theme::QUOTE_FORM_PLACEHOLDER)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(theme::TOKENS_BORDER),
+            );
+        frame.render_widget(paragraph, area);
+        return;
+    }
+
     let rows: Vec<Row> = state
         .filtered_indices
         .iter()
