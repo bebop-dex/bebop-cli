@@ -15,3 +15,11 @@ pub const CONTENT_TEXT: Style = Style::new().fg(Color::White);
 
 pub const FOOTER_BG: Style = Style::new().bg(Color::DarkGray);
 pub const FOOTER_KEY: Style = Style::new().fg(Color::White);
+
+// Dashboard tab
+pub const DASHBOARD_BORDER: Style = Style::new().fg(Color::DarkGray);
+pub const DASHBOARD_LOGO: Style = Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD);
+pub const DASHBOARD_LABEL: Style = Style::new().fg(Color::Gray);
+pub const DASHBOARD_VALUE: Style = Style::new().fg(Color::White);
+pub const DASHBOARD_OK: Style = Style::new().fg(Color::Green);
+pub const DASHBOARD_MISSING: Style = Style::new().fg(Color::Yellow);

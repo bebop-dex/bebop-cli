@@ -1,3 +1,5 @@
+use crate::config::Config;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActiveTab {
     Dashboard,
@@ -45,6 +47,7 @@ impl ActiveTab {
 pub struct App {
     pub active_tab: ActiveTab,
     pub running: bool,
+    pub config: Config,
 }
 
 impl App {
@@ -52,6 +55,7 @@ impl App {
         Self {
             active_tab: ActiveTab::Dashboard,
             running: true,
+            config: Config::load(),
         }
     }
 
