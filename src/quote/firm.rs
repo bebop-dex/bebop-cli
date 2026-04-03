@@ -129,8 +129,7 @@ pub async fn quote(
     api_key: Option<&str>,
     output: &OutputFormat,
 ) {
-    let authenticated = api_key.is_some();
-    if !authenticated {
+    if api_key.is_none() {
         eprintln!("\x1b[33mwarning: {}\x1b[0m", UNAUTHENTICATED_WARNING);
     }
 
@@ -204,7 +203,7 @@ pub async fn quote(
 
     match output {
         OutputFormat::Json => {
-            print_quotes_json(&outcomes, authenticated);
+            print_quotes_json(&outcomes);
         }
         OutputFormat::Text => {
             print_quotes_text(&outcomes);
@@ -257,7 +256,7 @@ fn quote_to_json(quote: &QuoteApiResponse) -> serde_json::Value {
     out
 }
 
-fn print_quotes_json(outcomes: &[QuoteOutcome], authenticated: bool) {
+fn print_quotes_json(outcomes: &[QuoteOutcome]) {
     let items: Vec<serde_json::Value> = outcomes.iter().map(|o| {
         match &o.result {
             Ok(quote) => quote_to_json(quote),
@@ -269,10 +268,7 @@ fn print_quotes_json(outcomes: &[QuoteOutcome], authenticated: bool) {
         }
     }).collect();
 
-    let mut out = json!({ "authenticated": authenticated, "quotes": items });
-    if !authenticated {
-        out["warning"] = json!(UNAUTHENTICATED_WARNING);
-    }
+    let out = json!({ "quotes": items });
 
     println!("{}", serde_json::to_string_pretty(&out).unwrap());
 }
