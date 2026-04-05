@@ -36,6 +36,11 @@ fn handle_key(app: &mut App, key: KeyEvent) {
         return;
     }
 
+    // Cancel quit confirmation on any key other than 'q'
+    if app.quit_confirm && key.code != KeyCode::Char('q') {
+        app.cancel_quit();
+    }
+
     // Layer 0: Global chain picker (Shift+C from any tab)
     if app.config_state.global_chain_picker {
         handle_global_chain_picker_key(app, key);

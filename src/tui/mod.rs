@@ -49,6 +49,8 @@ fn run_loop(
             app.handle_message(msg);
         }
 
+        app.expire_quit_confirm();
+
         if app.tokens_state.load_state == LoadState::Loading {
             app.tokens_state.spinner_tick = app.tokens_state.spinner_tick.wrapping_add(1);
         }

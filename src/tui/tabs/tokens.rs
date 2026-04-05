@@ -58,16 +58,7 @@ fn render_search_or_headers(frame: &mut Frame, area: Rect, app: &App) {
             frame.render_widget(Paragraph::new(line), area);
         }
         InputMode::Normal => {
-            let header = Line::from(vec![
-                Span::styled(" Symbol", theme::TOKENS_HEADER),
-                Span::raw("         "),
-                Span::styled("Name", theme::TOKENS_HEADER),
-                Span::raw("                            "),
-                Span::styled("Address", theme::TOKENS_HEADER),
-                Span::raw("                                 "),
-                Span::styled("Dec", theme::TOKENS_HEADER),
-            ]);
-            frame.render_widget(Paragraph::new(header), area);
+            // Table widget renders its own header row; nothing needed here.
         }
     }
 }

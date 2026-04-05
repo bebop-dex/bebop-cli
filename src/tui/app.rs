@@ -62,6 +62,8 @@ pub struct App {
     pub tx: UnboundedSender<AppMessage>,
     pub help_overlay_open: bool,
     pub help_scroll_offset: usize,
+    pub quit_confirm: bool,
+    pub quit_confirm_at: Option<std::time::Instant>,
 }
 
 impl App {
@@ -80,11 +82,31 @@ impl App {
             tx,
             help_overlay_open: false,
             help_scroll_offset: 0,
+            quit_confirm: false,
+            quit_confirm_at: None,
         }
     }
 
     pub fn quit(&mut self) {
-        self.running = false;
+        if self.quit_confirm {
+            self.running = false;
+        } else {
+            self.quit_confirm = true;
+            self.quit_confirm_at = Some(std::time::Instant::now());
+        }
+    }
+
+    pub fn cancel_quit(&mut self) {
+        self.quit_confirm = false;
+        self.quit_confirm_at = None;
+    }
+
+    pub fn expire_quit_confirm(&mut self) {
+        if let Some(at) = self.quit_confirm_at {
+            if at.elapsed() > std::time::Duration::from_secs(2) {
+                self.cancel_quit();
+            }
+        }
     }
 
     pub fn next_tab(&mut self) {

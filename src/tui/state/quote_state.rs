@@ -110,18 +110,16 @@ impl TokenSearchState {
         if self.query.is_empty() {
             self.filtered_indices = (0..self.tokens.len()).collect();
         } else {
-            let q = self.query.to_lowercase();
-            self.filtered_indices = self
+            let mut scored: Vec<(usize, u64)> = self
                 .tokens
                 .iter()
                 .enumerate()
-                .filter(|(_, t)| {
-                    t.symbol.to_lowercase().contains(&q)
-                        || t.name.to_lowercase().contains(&q)
-                        || t.address.to_lowercase().contains(&q)
+                .filter_map(|(i, t)| {
+                    crate::tokens::search_score(t, &self.query).map(|s| (i, s))
                 })
-                .map(|(i, _)| i)
                 .collect();
+            scored.sort_by_key(|&(_, s)| s);
+            self.filtered_indices = scored.into_iter().map(|(i, _)| i).collect();
         }
         if self.selected_index >= self.filtered_indices.len() {
             self.selected_index = self.filtered_indices.len().saturating_sub(1);

@@ -119,6 +119,15 @@ fn render_content(frame: &mut Frame, area: Rect, app: &mut App) {
 }
 
 fn render_footer(frame: &mut Frame, area: Rect, app: &App) {
+    if app.quit_confirm {
+        let footer = Line::from(vec![
+            Span::raw(" "),
+            Span::styled("press q again to quit", theme::FOOTER_KEY),
+        ]);
+        frame.render_widget(Paragraph::new(footer).style(theme::FOOTER_BG), area);
+        return;
+    }
+
     let hints: Vec<(&str, &str)> = if app.config_state.global_chain_picker {
         vec![
             ("\u{2191}\u{2193}", "navigate"),
