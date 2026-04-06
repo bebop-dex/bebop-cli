@@ -4,7 +4,7 @@ use std::time::SystemTime;
 
 const TTL_SECS: u64 = 3600;
 
-fn cache_dir() -> PathBuf {
+pub(crate) fn cache_dir() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     PathBuf::from(home).join(".cache").join("bebop-cli")
 }

@@ -16,7 +16,9 @@ serde_json = "1"
 tabled = "0.20"
 terminal_size = "0.4.4"
 self_update = { version = "0.43", features = ["archive-tar", "compression-flate2"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+ratatui-image = { version = "10.0.6", default-features = false, features = ["image-defaults", "crossterm"] }
+image = "0.25.10"
 
 # The profile that 'dist' will build with
 [profile.dist]

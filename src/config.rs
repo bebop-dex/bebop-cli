@@ -38,7 +38,7 @@ impl Config {
         }
     }
 
-    fn save(&self) {
+    pub fn save(&self) {
         let _ = fs::create_dir_all(config_dir());
         let data = serde_json::to_string_pretty(self).expect("failed to serialize config");
         let _ = fs::write(config_path(), data);

@@ -8,7 +8,7 @@ struct TokenList {
     tokens: Vec<Token>,
 }
 
-#[derive(Deserialize, Serialize, Tabled)]
+#[derive(Deserialize, Serialize, Tabled, Clone)]
 pub struct Token {
     pub symbol: String,
     pub name: String,
@@ -59,6 +59,35 @@ async fn unknown_chain(chain: &str) -> ! {
     std::process::exit(1);
 }
 
+/// Returns a search relevance score (lower = better match). `None` means no match.
+/// Priority: exact symbol > symbol prefix > exact name > name prefix > symbol contains > name contains > address contains.
+/// Within each tier, shorter symbols rank higher.
+pub fn search_score(token: &Token, query: &str) -> Option<u64> {
+    let q = query.to_lowercase();
+    let sym = token.symbol.to_lowercase();
+    let name = token.name.to_lowercase();
+    let addr = token.address.to_lowercase();
+    let len = sym.len() as u64;
+
+    if sym == q {
+        Some(len) // tier 0: exact symbol
+    } else if sym.starts_with(&q) {
+        Some(1000 + len) // tier 1: symbol prefix
+    } else if name == q {
+        Some(2000 + len) // tier 2: exact name
+    } else if name.starts_with(&q) {
+        Some(3000 + len) // tier 3: name prefix
+    } else if sym.contains(&q) {
+        Some(4000 + len) // tier 4: symbol contains
+    } else if name.contains(&q) {
+        Some(5000 + len) // tier 5: name contains
+    } else if addr.contains(&q) {
+        Some(6000 + len) // tier 6: address contains
+    } else {
+        None
+    }
+}
+
 pub async fn fetch_tokens(chain: &str) -> Vec<Token> {
     let cache_key = format!("tokens_{chain}");
     let mut tokens = if let Some(cached) = crate::cache::read(&cache_key) {
@@ -75,6 +104,28 @@ pub async fn fetch_tokens(chain: &str) -> Vec<Token> {
     };
     tokens.sort_by(|a, b| a.symbol.to_lowercase().cmp(&b.symbol.to_lowercase()));
     tokens
+}
+
+pub async fn try_fetch_tokens(chain: &str) -> Result<Vec<Token>, String> {
+    let cache_key = format!("tokens_{chain}");
+    let mut tokens = if let Some(cached) = crate::cache::read(&cache_key) {
+        serde_json::from_str(&cached).map_err(|e| e.to_string())?
+    } else {
+        let url = format!("https://api.bebop.xyz/pmm/{chain}/v3/tokenlist");
+        let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            return Err(format!("unknown chain '{chain}' (HTTP {})", resp.status()));
+        }
+        let tokens = resp
+            .json::<TokenList>()
+            .await
+            .map_err(|e| e.to_string())?
+            .tokens;
+        crate::cache::write(&cache_key, &serde_json::to_string(&tokens).unwrap());
+        tokens
+    };
+    tokens.sort_by(|a, b| a.symbol.to_lowercase().cmp(&b.symbol.to_lowercase()));
+    Ok(tokens)
 }
 
 pub fn resolve<'a>(query: &str, tokens: &'a [Token]) -> &'a Token {
@@ -180,16 +231,16 @@ pub async fn list(chain: &str, search: Option<&str>, output: &OutputFormat) {
         let all = fetch_all_tokens().await;
         spinner.finish_and_clear();
 
-        let tokens: Vec<&TokenWithChain> = all.iter().filter(|t| {
-            if let Some(q) = search {
-                let q = q.to_lowercase();
-                t.symbol.to_lowercase().contains(&q)
-                    || t.name.to_lowercase().contains(&q)
-                    || t.address.to_lowercase().contains(&q)
-            } else {
-                true
-            }
-        }).collect();
+        let tokens: Vec<&TokenWithChain> = if let Some(q) = search {
+            let mut scored: Vec<(&TokenWithChain, u64)> = all.iter().filter_map(|t| {
+                let tok = Token { symbol: t.symbol.clone(), name: t.name.clone(), address: t.address.clone(), decimals: t.decimals };
+                search_score(&tok, q).map(|s| (t, s))
+            }).collect();
+            scored.sort_by_key(|&(_, s)| s);
+            scored.into_iter().map(|(t, _)| t).collect()
+        } else {
+            all.iter().collect()
+        };
 
         match output {
             OutputFormat::Json => {
@@ -216,16 +267,15 @@ pub async fn list(chain: &str, search: Option<&str>, output: &OutputFormat) {
     let all = fetch_tokens(chain).await;
     spinner.finish_and_clear();
 
-    let tokens: Vec<&Token> = all.iter().filter(|t| {
-        if let Some(q) = search {
-            let q = q.to_lowercase();
-            t.symbol.to_lowercase().contains(&q)
-                || t.name.to_lowercase().contains(&q)
-                || t.address.to_lowercase().contains(&q)
-        } else {
-            true
-        }
-    }).collect();
+    let tokens: Vec<&Token> = if let Some(q) = search {
+        let mut scored: Vec<(&Token, u64)> = all.iter()
+            .filter_map(|t| search_score(t, q).map(|s| (t, s)))
+            .collect();
+        scored.sort_by_key(|&(_, s)| s);
+        scored.into_iter().map(|(t, _)| t).collect()
+    } else {
+        all.iter().collect()
+    };
 
     match output {
         OutputFormat::Json => {
