@@ -1,6 +1,6 @@
 [package]
 name = "bebop"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2024"
 description = "Command-line interface for the Bebop DEX RFQ trading API"
 repository = "https://github.com/bebop-dex/bebop-cli"
