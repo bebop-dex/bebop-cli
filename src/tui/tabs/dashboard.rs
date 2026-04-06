@@ -22,7 +22,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
 
 fn render_left_panel(frame: &mut Frame, area: Rect, app: &App) {
     let rows = Layout::vertical([
-        Constraint::Length(7),
+        Constraint::Length(11),
         Constraint::Min(1),
     ])
     .split(area);
@@ -34,19 +34,18 @@ fn render_left_panel(frame: &mut Frame, area: Rect, app: &App) {
 fn render_logo(frame: &mut Frame, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(theme::DASHBOARD_BORDER)
-        .title(" Logo ");
+        .border_style(theme::DASHBOARD_BORDER);
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let logo = Paragraph::new("BEBOP")
-        .style(theme::DASHBOARD_LOGO)
-        .alignment(Alignment::Center);
+    let art = crate::tui::widgets::icon::icon_lines();
+    let art_height = art.len() as u16;
+    let logo = Paragraph::new(art).alignment(Alignment::Center);
 
     let v = Layout::vertical([
         Constraint::Fill(1),
-        Constraint::Length(1),
+        Constraint::Length(art_height),
         Constraint::Fill(1),
     ])
     .split(inner);

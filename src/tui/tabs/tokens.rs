@@ -82,7 +82,7 @@ fn render_table(frame: &mut Frame, area: Rect, app: &mut App) {
         }
         LoadState::Error(err) => {
             let msg = Paragraph::new(format!(" Error: {err}"))
-                .style(ratatui::style::Style::new().fg(ratatui::style::Color::Red))
+                .style(theme::QUOTE_IMPACT_HIGH)
                 .block(Block::default().borders(Borders::ALL).border_style(theme::TOKENS_BORDER));
             frame.render_widget(msg, area);
         }
