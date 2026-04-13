@@ -6,7 +6,7 @@ use tabled::{Table, Tabled, settings::Style};
 
 use crate::OutputFormat;
 
-const VALID_KEYS: &[&str] = &["api-key", "wallet-address", "chain", "format"];
+const VALID_KEYS: &[&str] = &["api-key", "source", "wallet-address", "chain", "format"];
 const VALID_FORMATS: &[&str] = &["json", "text"];
 
 fn config_dir() -> PathBuf {
@@ -22,6 +22,8 @@ fn config_path() -> PathBuf {
 pub struct Config {
     #[serde(rename = "api-key", default, skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
     #[serde(rename = "wallet-address", default, skip_serializing_if = "Option::is_none")]
     pub wallet_address: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -47,6 +49,7 @@ impl Config {
     pub fn get(&self, key: &str) -> Option<&str> {
         match key {
             "api-key" => self.api_key.as_deref(),
+            "source" => self.source.as_deref(),
             "wallet-address" => self.wallet_address.as_deref(),
             "chain" => self.chain.as_deref(),
             "format" => self.format.as_deref(),
@@ -57,6 +60,7 @@ impl Config {
     fn set_value(&mut self, key: &str, value: String) {
         match key {
             "api-key" => self.api_key = Some(value),
+            "source" => self.source = Some(value),
             "wallet-address" => self.wallet_address = Some(value),
             "chain" => self.chain = Some(value),
             "format" => {
@@ -105,6 +109,7 @@ pub fn show(key: Option<&str>, output: &OutputFormat) {
         OutputFormat::Json => {
             let out = serde_json::json!({
                 "api-key": config.api_key,
+                "source": config.source,
                 "wallet-address": config.wallet_address,
                 "chain": config.chain,
                 "format": config.format,

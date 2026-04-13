@@ -3,6 +3,7 @@ use super::LoadState;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigField {
     ApiKey,
+    Source,
     WalletAddress,
     DefaultChain,
     OutputFormat,
@@ -11,7 +12,8 @@ pub enum ConfigField {
 impl ConfigField {
     pub fn next(self) -> Self {
         match self {
-            Self::ApiKey => Self::WalletAddress,
+            Self::ApiKey => Self::Source,
+            Self::Source => Self::WalletAddress,
             Self::WalletAddress => Self::DefaultChain,
             Self::DefaultChain => Self::OutputFormat,
             Self::OutputFormat => Self::ApiKey,
@@ -21,7 +23,8 @@ impl ConfigField {
     pub fn prev(self) -> Self {
         match self {
             Self::ApiKey => Self::OutputFormat,
-            Self::WalletAddress => Self::ApiKey,
+            Self::Source => Self::ApiKey,
+            Self::WalletAddress => Self::Source,
             Self::DefaultChain => Self::WalletAddress,
             Self::OutputFormat => Self::DefaultChain,
         }

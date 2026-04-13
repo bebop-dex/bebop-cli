@@ -45,6 +45,12 @@ enum Commands {
         /// Wallet address for the quote; uses config value if not provided
         #[arg(short, long)]
         wallet_address: Option<String>,
+        /// API key for the quote; uses config value if not provided
+        #[arg(long)]
+        api_key: Option<String>,
+        /// Source tag for the quote; uses config value if not provided
+        #[arg(long)]
+        source: Option<String>,
     },
     /// List tokens available for trading on Bebop PMM
     Tokens {
@@ -77,7 +83,7 @@ enum Commands {
 #[derive(Args)]
 #[command(args_conflicts_with_subcommands = true)]
 struct ConfigArgs {
-    /// Config key to display (api-key, wallet-address, chain, format)
+    /// Config key to display (api-key, source, wallet-address, chain, format)
     key: Option<String>,
     #[command(subcommand)]
     action: Option<ConfigAction>,
@@ -87,7 +93,7 @@ struct ConfigArgs {
 enum ConfigAction {
     /// Set a config value
     Set {
-        /// Config key (api-key, wallet-address, chain, format)
+        /// Config key (api-key, source, wallet-address, chain, format)
         key: String,
         /// Value to set
         value: String,
@@ -136,12 +142,14 @@ async fn main() {
             let chain = require_chain(chain, &cfg);
             tokens::list(&chain, search.as_deref(), &output).await;
         }
-        Some(Commands::Quote { firm, indicative: _, buy, sell, amount_buy, amount_sell, chain, wallet_address }) => {
+        Some(Commands::Quote { firm, indicative: _, buy, sell, amount_buy, amount_sell, chain, wallet_address, api_key, source }) => {
             let chain = require_chain(chain, &cfg);
             let wallet_address = wallet_address.or_else(|| cfg.wallet_address.clone())
                 .unwrap_or_else(|| "0x0000000000000000000000000000000000000000".to_string());
+            let api_key = api_key.or_else(|| cfg.api_key.clone());
+            let source = source.or_else(|| cfg.source.clone());
             if firm {
-                quote::firm::quote(&buy, &sell, &amount_buy, &amount_sell, &chain, &wallet_address, cfg.api_key.as_deref(), &output).await;
+                quote::firm::quote(&buy, &sell, &amount_buy, &amount_sell, &chain, &wallet_address, api_key.as_deref(), source.as_deref(), &output).await;
             } else {
                 println!("indicative quotes not yet implemented");
             }

@@ -79,6 +79,13 @@ fn render_config_summary(frame: &mut Frame, area: Rect, app: &App) {
         Span::styled("missing \u{2717}", theme::DASHBOARD_MISSING)
     };
 
+    let source = app.config.source.as_deref().unwrap_or("not set");
+    let source_style = if app.config.source.is_some() {
+        theme::DASHBOARD_VALUE
+    } else {
+        theme::DASHBOARD_MISSING
+    };
+
     let lines = vec![
         Line::from(vec![
             Span::styled("  Chain:   ", theme::DASHBOARD_LABEL),
@@ -91,6 +98,10 @@ fn render_config_summary(frame: &mut Frame, area: Rect, app: &App) {
         Line::from(vec![
             Span::styled("  API Key: ", theme::DASHBOARD_LABEL),
             api_status,
+        ]),
+        Line::from(vec![
+            Span::styled("  Source:  ", theme::DASHBOARD_LABEL),
+            Span::styled(source, source_style),
         ]),
     ];
 

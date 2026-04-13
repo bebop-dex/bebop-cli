@@ -244,6 +244,7 @@ impl App {
         let wallet = self.config.wallet_address.clone()
             .unwrap_or_else(|| "0x0000000000000000000000000000000000000000".to_string());
         let api_key = self.config.api_key.clone();
+        let source = self.config.source.clone();
 
         self.quote_state.quote_load_state = LoadState::Loading;
         self.quote_state.quote_error = None;
@@ -267,6 +268,7 @@ impl App {
                 &chain,
                 &wallet,
                 api_key.as_deref(),
+                source.as_deref(),
             )
             .await
             {
@@ -335,6 +337,7 @@ impl App {
             .clone()
             .unwrap_or_else(|| "0x0000000000000000000000000000000000000000".to_string());
         let api_key = self.config.api_key.clone();
+        let source = self.config.source.clone();
 
         for (index, entry) in self.quote_state.entries.iter().enumerate() {
             let tx = self.tx.clone();
@@ -345,6 +348,7 @@ impl App {
             let chain = entry.chain.clone();
             let wallet = wallet.clone();
             let api_key = api_key.clone();
+            let source = source.clone();
 
             tokio::spawn(async move {
                 use crate::quote::firm::{fetch_quote, from_base_units};
@@ -363,6 +367,7 @@ impl App {
                     &chain,
                     &wallet,
                     api_key.as_deref(),
+                    source.as_deref(),
                 )
                 .await
                 {

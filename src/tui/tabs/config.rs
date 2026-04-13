@@ -12,6 +12,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
         Constraint::Length(1), // Title
         Constraint::Length(1), // spacer
         Constraint::Length(1), // API Key
+        Constraint::Length(1), // Source
         Constraint::Length(1), // Wallet Address
         Constraint::Length(1), // Default Chain
         Constraint::Length(1), // Output Format
@@ -38,10 +39,20 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
         app,
     );
 
-    // Wallet Address
+    // Source
     render_field(
         frame,
         rows[3],
+        "Source:         ",
+        &format_source(app),
+        ConfigField::Source,
+        app,
+    );
+
+    // Wallet Address
+    render_field(
+        frame,
+        rows[4],
         "Wallet Address: ",
         &format_wallet(app),
         ConfigField::WalletAddress,
@@ -55,7 +66,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
     };
     render_field(
         frame,
-        rows[4],
+        rows[5],
         "Default Chain:  ",
         &chain_val,
         ConfigField::DefaultChain,
@@ -72,7 +83,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
     let fmt_val = format!("[{json_ind} json  {text_ind} text]");
     render_field(
         frame,
-        rows[5],
+        rows[6],
         "Output Format:  ",
         &fmt_val,
         ConfigField::OutputFormat,
@@ -85,7 +96,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &mut App) {
             Span::raw("  "),
             Span::styled(err.as_str(), theme::CONFIG_ERROR),
         ]);
-        frame.render_widget(Paragraph::new(err_line), rows[7]);
+        frame.render_widget(Paragraph::new(err_line), rows[8]);
     }
 
     // Chain picker overlay
@@ -122,6 +133,17 @@ fn format_api_key(app: &App) -> String {
     } else {
         match &app.config.api_key {
             Some(key) => format!("[{}]", "*".repeat(key.len().min(20))),
+            None => "[not set]".to_string(),
+        }
+    }
+}
+
+fn format_source(app: &App) -> String {
+    if app.config_state.editing && app.config_state.active_field == ConfigField::Source {
+        format!("[{}\u{258e}]", app.config_state.draft)
+    } else {
+        match &app.config.source {
+            Some(src) => format!("[{src}]"),
             None => "[not set]".to_string(),
         }
     }

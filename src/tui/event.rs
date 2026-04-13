@@ -584,6 +584,14 @@ fn handle_config_editing_key(app: &mut App, key: KeyEvent) {
                     }
                     Ok(())
                 }
+                ConfigField::Source => {
+                    if draft.is_empty() {
+                        app.config.source = None;
+                    } else {
+                        app.config.source = Some(draft);
+                    }
+                    Ok(())
+                }
                 ConfigField::WalletAddress => {
                     if draft.is_empty() {
                         app.config.wallet_address = None;
@@ -646,6 +654,10 @@ fn handle_config_field_activate(app: &mut App) {
     match app.config_state.active_field {
         ConfigField::ApiKey => {
             let current = app.config.api_key.as_deref().unwrap_or("");
+            app.config_state.start_editing(current);
+        }
+        ConfigField::Source => {
+            let current = app.config.source.as_deref().unwrap_or("");
             app.config_state.start_editing(current);
         }
         ConfigField::WalletAddress => {
