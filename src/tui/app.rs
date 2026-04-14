@@ -269,6 +269,7 @@ impl App {
                 &wallet,
                 api_key.as_deref(),
                 source.as_deref(),
+                false,
             )
             .await
             {
@@ -368,6 +369,7 @@ impl App {
                     &wallet,
                     api_key.as_deref(),
                     source.as_deref(),
+                    false,
                 )
                 .await
                 {

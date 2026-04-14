@@ -73,6 +73,7 @@ pub(crate) async fn fetch_quote(
     wallet_address: &str,
     api_key: Option<&str>,
     source: Option<&str>,
+    verbose: bool,
 ) -> Result<QuoteApiResponse, String> {
     let mut params = vec![
         ("buy_tokens".to_string(), buy_token.address.clone()),
@@ -95,13 +96,32 @@ pub(crate) async fn fetch_quote(
     let client = reqwest::Client::new();
     let mut req = client.get(&url).query(&params);
     if let Some(key) = api_key {
-        req = req.header("Authorization", key);
+        req = req.header("source-auth", key);
     }
+
+    if verbose {
+        let query_str = params
+            .iter()
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect::<Vec<_>>()
+            .join("&");
+        eprintln!("\x1b[2m[debug] GET {url}?{query_str}\x1b[0m");
+        eprintln!("\x1b[2m[debug] auth: {}\x1b[0m", if api_key.is_some() { "yes" } else { "none" });
+    }
+
     let resp = req.send().await.expect("failed to request quote");
 
     if !resp.status().is_success() {
+        let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("quote request failed: {}", body));
+        if verbose {
+            eprintln!("\x1b[2m[debug] response {status}: {body}\x1b[0m");
+        }
+        return Err(format!("quote request failed ({status}): {body}"));
+    }
+
+    if verbose {
+        eprintln!("\x1b[2m[debug] response {}\x1b[0m", resp.status());
     }
 
     let raw: serde_json::Value = resp.json().await.expect("failed to parse quote response");
@@ -133,6 +153,7 @@ pub async fn quote(
     wallet_address: &str,
     api_key: Option<&str>,
     source: Option<&str>,
+    verbose: bool,
     output: &OutputFormat,
 ) {
     if api_key.is_none() {
@@ -171,20 +192,20 @@ pub async fn quote(
         for (i, bt) in buy_tokens.iter().enumerate() {
             let ab = amounts_buy.get(i).map(|s| s.as_str());
             let as_ = amounts_sell.first().map(|s| s.as_str());
-            futs.push(Box::pin(fetch_quote(bt, sell_tokens[0], ab, as_, chain, wallet_address, api_key, source)));
+            futs.push(Box::pin(fetch_quote(bt, sell_tokens[0], ab, as_, chain, wallet_address, api_key, source, verbose)));
             labels.push((&buys[i], &sells[0]));
         }
     } else if sells.len() > 1 {
         for (i, st) in sell_tokens.iter().enumerate() {
             let ab = amounts_buy.first().map(|s| s.as_str());
             let as_ = amounts_sell.get(i).map(|s| s.as_str());
-            futs.push(Box::pin(fetch_quote(buy_tokens[0], st, ab, as_, chain, wallet_address, api_key, source)));
+            futs.push(Box::pin(fetch_quote(buy_tokens[0], st, ab, as_, chain, wallet_address, api_key, source, verbose)));
             labels.push((&buys[0], &sells[i]));
         }
     } else {
         let ab = amounts_buy.first().map(|s| s.as_str());
         let as_ = amounts_sell.first().map(|s| s.as_str());
-        futs.push(Box::pin(fetch_quote(buy_tokens[0], sell_tokens[0], ab, as_, chain, wallet_address, api_key, source)));
+        futs.push(Box::pin(fetch_quote(buy_tokens[0], sell_tokens[0], ab, as_, chain, wallet_address, api_key, source, verbose)));
         labels.push((&buys[0], &sells[0]));
     }
 
@@ -203,6 +224,11 @@ pub async fn quote(
         .collect();
 
     if outcomes.iter().all(|o| o.result.is_err()) {
+        for o in &outcomes {
+            if let Err(e) = &o.result {
+                eprintln!("  {} -> {}: {}", o.sell_label, o.buy_label, e);
+            }
+        }
         eprintln!("error: all quotes failed");
         std::process::exit(1);
     }

@@ -15,6 +15,9 @@ struct Cli {
     command: Option<Commands>,
     #[arg(short, long, global = true)]
     output: Option<OutputFormat>,
+    /// Verbose debug logging (prints outgoing request URLs and params)
+    #[arg(short, long, global = true)]
+    verbose: bool,
 }
 
 #[derive(Subcommand)]
@@ -119,6 +122,7 @@ fn require_chain(chain: Option<String>, cfg: &config::Config) -> String {
 async fn main() {
     let cli = Cli::parse();
     let cfg = config::Config::load();
+    let verbose = cli.verbose;
 
     let output = cli.output.unwrap_or_else(|| {
         match cfg.format.as_deref() {
@@ -149,7 +153,7 @@ async fn main() {
             let api_key = api_key.or_else(|| cfg.api_key.clone());
             let source = source.or_else(|| cfg.source.clone());
             if firm {
-                quote::firm::quote(&buy, &sell, &amount_buy, &amount_sell, &chain, &wallet_address, api_key.as_deref(), source.as_deref(), &output).await;
+                quote::firm::quote(&buy, &sell, &amount_buy, &amount_sell, &chain, &wallet_address, api_key.as_deref(), source.as_deref(), verbose, &output).await;
             } else {
                 println!("indicative quotes not yet implemented");
             }
