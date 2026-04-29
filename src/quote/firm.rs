@@ -73,6 +73,7 @@ pub(crate) async fn fetch_quote(
     wallet_address: &str,
     api_key: Option<&str>,
     source: Option<&str>,
+    include_makers: &[String],
     verbose: bool,
 ) -> Result<QuoteApiResponse, String> {
     let mut params = vec![
@@ -90,6 +91,10 @@ pub(crate) async fn fetch_quote(
 
     if let Some(src) = source {
         params.push(("source".to_string(), src.to_string()));
+    }
+
+    if !include_makers.is_empty() {
+        params.push(("include_makers".to_string(), include_makers.join(",")));
     }
 
     let url = format!("https://api.bebop.xyz/pmm/{chain}/v3/quote");
@@ -153,6 +158,7 @@ pub async fn quote(
     wallet_address: &str,
     api_key: Option<&str>,
     source: Option<&str>,
+    include_makers: &[String],
     verbose: bool,
     output: &OutputFormat,
 ) {
@@ -192,20 +198,20 @@ pub async fn quote(
         for (i, bt) in buy_tokens.iter().enumerate() {
             let ab = amounts_buy.get(i).map(|s| s.as_str());
             let as_ = amounts_sell.first().map(|s| s.as_str());
-            futs.push(Box::pin(fetch_quote(bt, sell_tokens[0], ab, as_, chain, wallet_address, api_key, source, verbose)));
+            futs.push(Box::pin(fetch_quote(bt, sell_tokens[0], ab, as_, chain, wallet_address, api_key, source, include_makers, verbose)));
             labels.push((&buys[i], &sells[0]));
         }
     } else if sells.len() > 1 {
         for (i, st) in sell_tokens.iter().enumerate() {
             let ab = amounts_buy.first().map(|s| s.as_str());
             let as_ = amounts_sell.get(i).map(|s| s.as_str());
-            futs.push(Box::pin(fetch_quote(buy_tokens[0], st, ab, as_, chain, wallet_address, api_key, source, verbose)));
+            futs.push(Box::pin(fetch_quote(buy_tokens[0], st, ab, as_, chain, wallet_address, api_key, source, include_makers, verbose)));
             labels.push((&buys[0], &sells[i]));
         }
     } else {
         let ab = amounts_buy.first().map(|s| s.as_str());
         let as_ = amounts_sell.first().map(|s| s.as_str());
-        futs.push(Box::pin(fetch_quote(buy_tokens[0], sell_tokens[0], ab, as_, chain, wallet_address, api_key, source, verbose)));
+        futs.push(Box::pin(fetch_quote(buy_tokens[0], sell_tokens[0], ab, as_, chain, wallet_address, api_key, source, include_makers, verbose)));
         labels.push((&buys[0], &sells[0]));
     }
 

@@ -54,6 +54,9 @@ enum Commands {
         /// Source tag for the quote; uses config value if not provided
         #[arg(long)]
         source: Option<String>,
+        /// Restrict makers — emoji(s) passed as include_makers (e.g. 🦊3, or 🦊2 🦊3)
+        #[arg(long, value_name = "MAKER", num_args = 1..)]
+        from: Vec<String>,
     },
     /// List tokens available for trading on Bebop PMM
     Tokens {
@@ -146,14 +149,14 @@ async fn main() {
             let chain = require_chain(chain, &cfg);
             tokens::list(&chain, search.as_deref(), &output).await;
         }
-        Some(Commands::Quote { firm, indicative: _, buy, sell, amount_buy, amount_sell, chain, wallet_address, api_key, source }) => {
+        Some(Commands::Quote { firm, indicative: _, buy, sell, amount_buy, amount_sell, chain, wallet_address, api_key, source, from }) => {
             let chain = require_chain(chain, &cfg);
             let wallet_address = wallet_address.or_else(|| cfg.wallet_address.clone())
                 .unwrap_or_else(|| "0x0000000000000000000000000000000000000000".to_string());
             let api_key = api_key.or_else(|| cfg.api_key.clone());
             let source = source.or_else(|| cfg.source.clone());
             if firm {
-                quote::firm::quote(&buy, &sell, &amount_buy, &amount_sell, &chain, &wallet_address, api_key.as_deref(), source.as_deref(), verbose, &output).await;
+                quote::firm::quote(&buy, &sell, &amount_buy, &amount_sell, &chain, &wallet_address, api_key.as_deref(), source.as_deref(), &from, verbose, &output).await;
             } else {
                 println!("indicative quotes not yet implemented");
             }
